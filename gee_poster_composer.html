@@ -6,7 +6,7 @@
   <title>Compositor de pòster (GEE)</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#f6f7fb; color:#111; }
-    header { padding: 14px 16px; background:#fff; border-bottom:1px solid #e6e8f0; position:sticky; top:0; }
+    header { padding: 14px 16px; background:#fff; border-bottom:1px solid #e6e8f0; position:sticky; top:0; z-index:5; }
     header h1 { font-size: 16px; margin:0; }
     header .sub { font-size: 12px; color:#444; margin-top:4px; }
     main { padding: 14px 16px; display:grid; grid-template-columns: 360px 1fr; gap: 14px; align-items:start; }
@@ -14,9 +14,9 @@
     .card { background:#fff; border:1px solid #e6e8f0; border-radius: 14px; padding: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
     .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     label { font-size: 12px; color:#333; display:block; margin: 10px 0 6px; }
-    input, textarea, select { width:100%; box-sizing:border-box; border:1px solid #d8dbe6; border-radius: 10px; padding: 10px; font-size: 13px; background:#fff; }
+    input, textarea { width:100%; box-sizing:border-box; border:1px solid #d8dbe6; border-radius: 10px; padding: 10px; font-size: 13px; background:#fff; }
     textarea { min-height: 68px; resize: vertical; }
-    button { border:0; border-radius: 12px; padding: 10px 12px; font-weight: 600; cursor:pointer; }
+    button { border:0; border-radius: 12px; padding: 10px 12px; font-weight: 700; cursor:pointer; }
     button.primary { background:#111; color:#fff; }
     button.secondary { background:#eef1f8; color:#111; }
     .hint { font-size: 12px; color:#555; margin-top: 8px; line-height: 1.35; }
@@ -29,7 +29,7 @@
 <body>
 <header>
   <h1>Compositor de pòster (GEE)</h1>
-  <div class="sub">Carrega un PNG del mapa (getThumbURL) i genera un pòster final amb títol, llegenda, nord, escala i logo.</div>
+  <div class="sub">Obre'l des del visor. Compatible amb <span class="mono">?p=</span> (payload) o amb paràmetres clàssics (<span class="mono">?map=</span>).</div>
 </header>
 
 <main>
@@ -39,18 +39,18 @@
       <button class="secondary" id="btnDownload">Descarregar PNG</button>
     </div>
     <div class="hint">
-      Recomanat: allotja aquest fitxer com a pàgina (p.ex. GitHub Pages) i obre'l amb una URL del tipus:<br>
-      <span class="mono">...?map=&lt;MAP_URL&gt;&amp;title=...&amp;subtitle=...&amp;min=...&amp;max=...&amp;unit=...&amp;scalekm=...</span>
+      Des del visor, l'enllaç sol venir com <span class="mono">?p=...</span> (payload). Si vols provar manualment:
+      <span class="mono">?map=&lt;MAP_URL&gt;&amp;title=...&amp;subtitle=...&amp;min=...&amp;max=...&amp;unit=...</span>
     </div>
 
     <label>URL del mapa (PNG) *</label>
-    <input id="mapUrl" placeholder="Enganxa aquí el getThumbURL del mapa base" />
+    <input id="mapUrl" placeholder="getThumbURL del mapa base (PNG)" />
 
     <label>Títol</label>
-    <input id="title" placeholder="Ex: Illa d'Aland — NDVI peak" />
+    <input id="title" placeholder="Ex: Comparador insular" />
 
     <label>Subtítol (1–3 línies)</label>
-    <textarea id="subtitle" placeholder="Ex: Any 2020 · Variable: NDVI peak · Font: MODIS"></textarea>
+    <textarea id="subtitle" placeholder="Ex: Variable · Mode · Data"></textarea>
 
     <div class="row">
       <div style="flex:1">
@@ -76,17 +76,16 @@
         <input id="scaleKm" placeholder="Ex: 50" />
       </div>
       <div style="flex:1">
-        <label>Nom del logo</label>
+        <label>Nom marca</label>
         <input id="brand" placeholder="Càtedra de la Insularitat" />
       </div>
     </div>
 
-    <label>Notes (peu)</label>
-    <input id="footer" placeholder="Ex: GEE · Copernicus · CHIRPS · VIIRS · ERA5" />
+    <label>Peu</label>
+    <input id="footer" placeholder="Ex: GEE · Copernicus · Consell Insular" />
 
     <div class="tiny" style="margin-top:10px;">
-      Si el mapa no carrega, és gairebé sempre un tema de CORS del servidor del PNG.
-      Solució: usa el teu compositor allotjat al mateix domini que descarrega el PNG (proxy) o baixa el mapa i carrega'l com a fitxer local.
+      Si el mapa no carrega o la descàrrega falla, sol ser CORS. Solució: afegir proxy o carregar PNG local (es pot afegir si ho necessites).
     </div>
 
     <div class="err" id="err"></div>
@@ -101,8 +100,42 @@
 (function(){
   function qs(k){ return new URLSearchParams(location.search).get(k); }
   function setIf(id, v){ if(v!==null && v!==undefined && v!==""){ document.getElementById(id).value = v; } }
+  function sanitize(s){ return (s===null||s===undefined) ? "" : String(s); }
 
-  // Prefill from query params
+  // ---- Read payload ?p= (preferred from visor) ----
+  var p = qs("p");
+  if (p) {
+    try {
+      var payload = JSON.parse(decodeURIComponent(p));
+      // The visor sends dataUrl, dims, meta (min/max/unit/palette), title/subtitle.
+      setIf("mapUrl", payload.dataUrl || payload.mapUrl || payload.map);
+      setIf("title", payload.title);
+      // Build a helpful subtitle if none provided
+      var sub = payload.subtitle || "";
+      if (!sub && payload.meta) {
+        var m = payload.meta;
+        var parts = [];
+        if (m.mode) parts.push(m.mode);
+        if (m.map) parts.push(m.map);
+        if (m.island) parts.push(m.island);
+        if (m.date) parts.push(m.date);
+        sub = parts.join(" · ");
+      }
+      setIf("subtitle", sub);
+      if (payload.meta) {
+        setIf("vmin", payload.meta.min);
+        setIf("vmax", payload.meta.max);
+        setIf("unit", payload.meta.unit);
+        if (payload.meta.palette && payload.meta.palette.length) {
+          setIf("palette", payload.meta.palette.join(","));
+        }
+      }
+    } catch(e) {
+      // ignore, fall back to classic params
+    }
+  }
+
+  // ---- Classic params fallback ----
   setIf("mapUrl", qs("map"));
   setIf("title", qs("title"));
   setIf("subtitle", qs("subtitle"));
@@ -160,7 +193,6 @@
   }
 
   function drawDroplet(x, y, h){
-    // Simple vector droplet (no external assets)
     var w = h * 0.72;
     ctx.save();
     ctx.translate(x, y);
@@ -176,7 +208,7 @@
 
   function parsePalette(s){
     if(!s) return ["#440154","#3b528b","#21918c","#5ec962","#fde725"];
-    return s.split(",").map(function(x){
+    return String(s).split(",").map(function(x){
       x = (x||"").trim().replace("#","");
       if(!x) return null;
       if(x.length===3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
@@ -185,7 +217,6 @@
   }
 
   function drawLegend(x,y,w,h, vmin, vmax, unit, palette){
-    // Card
     ctx.save();
     ctx.globalAlpha = 0.96;
     ctx.fillStyle = "#fff";
@@ -197,14 +228,12 @@
     drawRoundedRect(x,y,w,h,18);
     ctx.stroke();
 
-    // Title
     ctx.fillStyle = "#111";
-    ctx.font = "600 20px system-ui, sans-serif";
+    ctx.font = "700 20px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(unit || "Llegenda", x+16, y+14);
 
-    // Gradient bar
     var barX = x+16, barY = y+46, barW = w-32, barH = 18;
     var grad = ctx.createLinearGradient(barX,0,barX+barW,0);
     var stops = palette.length-1;
@@ -215,13 +244,12 @@
     drawRoundedRect(barX, barY, barW, barH, 9);
     ctx.fill();
 
-    // Labels
     ctx.fillStyle = "#333";
-    ctx.font = "500 14px system-ui, sans-serif";
+    ctx.font = "600 14px system-ui, sans-serif";
     ctx.textBaseline = "top";
-    ctx.fillText(String(vmin ?? ""), barX, barY+barH+10);
+    ctx.fillText(sanitize(vmin), barX, barY+barH+10);
     ctx.textAlign = "right";
-    ctx.fillText(String(vmax ?? ""), barX+barW, barY+barH+10);
+    ctx.fillText(sanitize(vmax), barX+barW, barY+barH+10);
     ctx.restore();
   }
 
@@ -234,12 +262,11 @@
     ctx.moveTo(x, y);
     ctx.lineTo(x+widthPx, y);
     ctx.stroke();
-    // end ticks
     ctx.beginPath();
     ctx.moveTo(x, y-8); ctx.lineTo(x, y+8);
     ctx.moveTo(x+widthPx, y-8); ctx.lineTo(x+widthPx, y+8);
     ctx.stroke();
-    ctx.font = "500 14px system-ui, sans-serif";
+    ctx.font = "700 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillText(label, x+widthPx/2, y-10);
@@ -262,53 +289,49 @@
     var brand = document.getElementById("brand").value.trim() || "Càtedra de la Insularitat";
     var footer = document.getElementById("footer").value.trim();
 
-    // Layout constants
     var W = canvas.width, H = canvas.height;
     var pad = 60;
 
-    // Clear background
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0,0,W,H);
 
-    // Load map image
     var img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = function(){
-      // Header
+      // Header band
       ctx.fillStyle = "#fff";
       ctx.fillRect(0,0,W,140);
       ctx.strokeStyle = "rgba(0,0,0,0.06)";
       ctx.beginPath(); ctx.moveTo(0,140); ctx.lineTo(W,140); ctx.stroke();
 
-      // Brand + droplet
       drawDroplet(pad, 70, 44);
       ctx.fillStyle = "#111";
-      ctx.font = "700 22px system-ui, sans-serif";
+      ctx.font = "800 22px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(brand, pad+42, 70);
 
-      // Title + subtitle
-      ctx.font = "700 28px system-ui, sans-serif";
+      ctx.fillStyle = "#111";
+      ctx.font = "900 28px system-ui, sans-serif";
       ctx.textBaseline = "top";
       ctx.fillText(title || "Pòster", pad, 150);
 
-      ctx.font = "500 16px system-ui, sans-serif";
+      ctx.font = "600 16px system-ui, sans-serif";
       ctx.fillStyle = "#333";
       var lines = subtitle ? subtitle.split("\n").slice(0,3) : [];
       for(var i=0;i<lines.length;i++){
         ctx.fillText(lines[i], pad, 188 + i*20);
       }
 
-      // Map placement
+      // Map frame region
       var mapTop = 240;
       var mapX = pad;
       var mapY = mapTop;
       var mapW = W - pad*2;
       var mapH = H - mapTop - 120;
 
-      // Keep aspect
+      // aspect fit
       var ar = img.width / img.height;
       var targetAr = mapW / mapH;
       var drawW, drawH, dx, dy;
@@ -324,7 +347,6 @@
         dy = mapY;
       }
 
-      // Map frame
       ctx.fillStyle = "#fff";
       drawRoundedRect(mapX, mapY, mapW, mapH, 22);
       ctx.fill();
@@ -333,28 +355,24 @@
       drawRoundedRect(mapX, mapY, mapW, mapH, 22);
       ctx.stroke();
 
-      // Clip map to rounded rect
       ctx.save();
       drawRoundedRect(mapX, mapY, mapW, mapH, 22);
       ctx.clip();
       ctx.drawImage(img, dx, dy, drawW, drawH);
       ctx.restore();
 
-      // North arrow + scale bar inside map
       drawNorthArrow(mapX + mapW - 70, mapY + 85, 26);
 
       if(scaleKm){
         var km = Number(scaleKm);
         if(isFinite(km) && km>0){
-          // We can't compute true scale without map resolution, so we draw a labeled bar with a reasonable pixel width.
-          // If you pass scalepx in query params, we'll respect it; otherwise use 180px.
           var scalepx = Number(qs("scalepx") || 180);
           if(!isFinite(scalepx) || scalepx<=0) scalepx = 180;
           drawScaleBar(mapX + 28, mapY + mapH - 28, scalepx, km + " km");
         }
       }
 
-      // Legend card (bottom-right)
+      // Legend card
       var legW = 420, legH = 110;
       var legX = mapX + mapW - legW - 22;
       var legY = mapY + mapH - legH - 22;
@@ -362,7 +380,7 @@
 
       // Footer
       ctx.fillStyle = "#444";
-      ctx.font = "500 13px system-ui, sans-serif";
+      ctx.font = "600 13px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(footer || "", pad, H - 40);
@@ -373,7 +391,7 @@
     };
 
     img.onerror = function(){
-      setErr("No s'ha pogut carregar el PNG del mapa.\n\n- Revisa que l'URL sigui correcte.\n- Pot ser un bloqueig de CORS del servidor del PNG.\n\nSi és CORS, baixa el PNG i carrega'l amb un compositor allotjat amb proxy, o obre aquest fitxer des d'un servidor (no file://).");
+      setErr("No s'ha pogut carregar el PNG del mapa.\n\n- Revisa que l'URL sigui correcte.\n- Pot ser CORS.\n\nProva d'obrir el dataUrl directament en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.");
     };
 
     img.src = mapUrl;
@@ -389,15 +407,15 @@
       a.click();
       a.remove();
     } catch(e){
-      setErr("No s'ha pogut exportar el canvas a PNG (possiblement 'tainted canvas' per CORS).\n\nDetall:\n" + e);
+      setErr("No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n" + e);
     }
   }
 
   document.getElementById("btnRender").addEventListener("click", render);
   document.getElementById("btnDownload").addEventListener("click", download);
 
-  // Auto-render if map param exists
-  if (qs("map")) setTimeout(render, 50);
+  // Auto-render if payload exists
+  if (qs("p") || qs("map")) setTimeout(render, 50);
 })();
 </script>
 </body>
