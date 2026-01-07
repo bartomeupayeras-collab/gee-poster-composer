@@ -3,158 +3,342 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Compositor de pòster (GEE)</title>
+  <title>GEE Poster Composer</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background:#f6f7fb; color:#111; }
-    header { padding: 14px 16px; background:#fff; border-bottom:1px solid #e6e8f0; position:sticky; top:0; z-index:5; }
-    header h1 { font-size: 16px; margin:0; }
-    header .sub { font-size: 12px; color:#444; margin-top:4px; }
-    main { padding: 14px 16px; display:grid; grid-template-columns: 360px 1fr; gap: 14px; align-items:start; }
-    @media (max-width: 980px){ main{ grid-template-columns: 1fr; } }
-    .card { background:#fff; border:1px solid #e6e8f0; border-radius: 14px; padding: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
-    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    label { font-size: 12px; color:#333; display:block; margin: 10px 0 6px; }
-    input, textarea { width:100%; box-sizing:border-box; border:1px solid #d8dbe6; border-radius: 10px; padding: 10px; font-size: 13px; background:#fff; }
-    textarea { min-height: 68px; resize: vertical; }
-    button { border:0; border-radius: 12px; padding: 10px 12px; font-weight: 700; cursor:pointer; }
-    button.primary { background:#111; color:#fff; }
-    button.secondary { background:#eef1f8; color:#111; }
-    .hint { font-size: 12px; color:#555; margin-top: 8px; line-height: 1.35; }
-    .err { color:#b00020; font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
-    canvas { width:100%; height:auto; background:#fff; border:1px solid #e6e8f0; border-radius: 14px; }
-    .tiny { font-size:11px; color:#666; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --line:#e6e8f0;
+      --text:#111;
+      --muted:#4b5563;
+      --muted2:#6b7280;
+      --brand:#111;
+      --soft:#eef1f8;
+      --danger:#b00020;
+      --radius:16px;
+      --shadow: 0 8px 30px rgba(0,0,0,0.06);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      margin:0; background:var(--bg); color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+    .wrap{ max-width: 1280px; margin:0 auto; padding: 14px 16px; }
+    .top{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    }
+    .title{
+      display:flex; align-items:center; gap:10px;
+    }
+    .mark{
+      width:34px; height:34px; border-radius:12px;
+      background: var(--brand);
+      display:grid; place-items:center; color:#fff; font-weight:900;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      user-select:none;
+    }
+    h1{ font-size:14px; margin:0; letter-spacing:.2px; }
+    .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
+    .btns{ display:flex; gap:10px; flex-wrap:wrap; }
+    button{
+      border:0; border-radius: 14px;
+      padding: 10px 12px; font-weight: 800; cursor:pointer;
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    }
+    button.primary{ background:var(--brand); color:#fff; }
+    button.secondary{ background:var(--soft); color:var(--text); }
+    button:disabled{ opacity:0.55; cursor:not-allowed; }
+
+    main .grid{
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap:14px;
+      align-items:start;
+      padding: 14px 16px;
+      max-width: 1280px;
+      margin:0 auto;
+    }
+    @media (max-width: 980px){
+      main .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .pad{ padding: 12px; }
+
+    .hint{
+      font-size:12px; color:var(--muted);
+      line-height:1.35;
+    }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    label{ font-size:12px; color:#374151; display:block; margin:10px 0 6px; }
+    input, textarea, select{
+      width:100%;
+      border:1px solid #d8dbe6;
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 13px;
+      background:#fff;
+    }
+    textarea{ min-height: 70px; resize:vertical; }
+
+    details{
+      border-top:1px solid var(--line);
+      background: #fbfbfe;
+    }
+    details summary{
+      list-style:none;
+      cursor:pointer;
+      padding: 12px;
+      font-weight: 800;
+      color:#111;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      user-select:none;
+    }
+    details summary::-webkit-details-marker{ display:none; }
+    details .pad{ padding: 12px; }
+
+    .tog{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top: 10px;
+    }
+    .pill{
+      display:flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border:1px solid var(--line);
+      border-radius: 999px;
+      background:#fff;
+      font-size:12px;
+      color:#111;
+      user-select:none;
+    }
+    .pill input{ width:auto; margin:0; }
+
+    .err{
+      color:var(--danger);
+      font-size:12px;
+      white-space:pre-wrap;
+      border-top:1px solid var(--line);
+      background:#fff5f7;
+      padding: 10px 12px;
+      display:none;
+    }
+    .ok{
+      font-size:12px;
+      color: var(--muted2);
+      margin-top:10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .canvasWrap{ padding: 12px; }
+    canvas{
+      width:100%;
+      height:auto;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      display:block;
+    }
+
+    .mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; }
+    .spin{
+      display:inline-block;
+      width:14px; height:14px;
+      border-radius:999px;
+      border:2px solid rgba(0,0,0,0.15);
+      border-top-color: rgba(0,0,0,0.7);
+      animation: r 0.7s linear infinite;
+      vertical-align:-2px;
+      margin-right:8px;
+    }
+    @keyframes r{ to{ transform:rotate(360deg);} }
   </style>
 </head>
 <body>
 <header>
-  <h1>Compositor de pòster (GEE)</h1>
-  <div class="sub">Obre'l des del visor. Compatible amb <span class="mono">?p=</span> (payload) o amb paràmetres clàssics (<span class="mono">?map=</span>).</div>
+  <div class="wrap">
+    <div class="top">
+      <div class="title">
+        <div class="mark">G</div>
+        <div>
+          <h1>GEE Poster Composer</h1>
+          <div class="sub">Obre’l des del visor · suport <span class="mono">?p=</span> (payload) i <span class="mono">?map=</span></div>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="secondary" id="btnReset" title="Recarregar valors del payload">Recarregar</button>
+        <button class="primary" id="btnRender">Generar</button>
+        <button class="secondary" id="btnDownload">Descarregar PNG</button>
+      </div>
+    </div>
+  </div>
 </header>
 
 <main>
-  <section class="card">
-    <div class="row">
-      <button class="primary" id="btnRender">Generar / Actualitzar</button>
-      <button class="secondary" id="btnDownload">Descarregar PNG</button>
-    </div>
-    <div class="hint">
-      Des del visor, l'enllaç sol venir com <span class="mono">?p=...</span> (payload). Si vols provar manualment:
-      <span class="mono">?map=&lt;MAP_URL&gt;&amp;title=...&amp;subtitle=...&amp;min=...&amp;max=...&amp;unit=...</span>
-    </div>
+  <div class="grid">
+    <section class="card">
+      <div class="pad">
+        <div class="hint">
+          Normalment no has de tocar res: el visor envia tot via <span class="mono">?p=</span>.
+          Si proves manualment: <span class="mono">?map=&lt;PNG_URL&gt;&amp;title=...&amp;subtitle=...</span>
+        </div>
 
-    <label>URL del mapa (PNG) *</label>
-    <input id="mapUrl" placeholder="getThumbURL del mapa base (PNG)" />
+        <label>Mapa (PNG) *</label>
+        <input id="mapUrl" placeholder="getThumbURL del mapa base (PNG)" />
 
-    <label>Títol</label>
-    <input id="title" placeholder="Ex: Comparador insular" />
+        <div class="row">
+          <div style="flex:1">
+            <label>Amplada pòster</label>
+            <select id="posterW">
+              <option value="2400">2400 px</option>
+              <option value="3200" selected>3200 px</option>
+              <option value="4000">4000 px</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label>Marge intern</label>
+            <select id="padPx">
+              <option value="44">Compacte</option>
+              <option value="60" selected>Normal</option>
+              <option value="78">Airejat</option>
+            </select>
+          </div>
+        </div>
 
-    <label>Subtítol (1–3 línies)</label>
-    <textarea id="subtitle" placeholder="Ex: Variable · Mode · Data"></textarea>
+        <div class="tog">
+          <label class="pill"><input type="checkbox" id="showLegend" checked> Llegenda</label>
+          <label class="pill"><input type="checkbox" id="showNorth" checked> Nord</label>
+          <label class="pill"><input type="checkbox" id="showScale"> Escala</label>
+          <label class="pill"><input type="checkbox" id="showFooter" checked> Peu</label>
+        </div>
 
-    <div class="row">
-      <div style="flex:1">
-        <label>Min</label>
-        <input id="vmin" placeholder="Ex: 0.12" />
+        <div class="ok">
+          <div id="status"></div>
+          <div class="mono" id="fn"></div>
+        </div>
       </div>
-      <div style="flex:1">
-        <label>Max</label>
-        <input id="vmax" placeholder="Ex: 0.78" />
+
+      <details id="adv">
+        <summary>
+          <span>Detalls (avançat)</span>
+          <span class="mono">títol · llegenda · marca</span>
+        </summary>
+        <div class="pad">
+          <label>Títol</label>
+          <input id="title" placeholder="Ex: Comparador insular" />
+
+          <label>Subtítol (1–3 línies)</label>
+          <textarea id="subtitle" placeholder="Ex: Variable · Mode · Any"></textarea>
+
+          <div class="row">
+            <div style="flex:1">
+              <label>Min</label>
+              <input id="vmin" placeholder="Ex: 0.12" />
+            </div>
+            <div style="flex:1">
+              <label>Max</label>
+              <input id="vmax" placeholder="Ex: 0.78" />
+            </div>
+            <div style="flex:1">
+              <label>Unitat</label>
+              <input id="unit" placeholder="Ex: NDVI / °C / mm" />
+            </div>
+          </div>
+
+          <label>Paleta (hex separats per coma)</label>
+          <input id="palette" placeholder="440154,3b528b,21918c,5ec962,fde725" />
+
+          <div class="row">
+            <div style="flex:1">
+              <label>Escala (km) (si activada)</label>
+              <input id="scaleKm" placeholder="Ex: 50" />
+            </div>
+            <div style="flex:1">
+              <label>Amplada escala (px)</label>
+              <input id="scalePx" placeholder="Ex: 180" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div style="flex:1">
+              <label>Marca</label>
+              <input id="brand" placeholder="Càtedra de la Insularitat" />
+            </div>
+            <div style="flex:1">
+              <label>Peu</label>
+              <input id="footer" placeholder="Ex: GEE · Copernicus · Consell Insular" />
+            </div>
+          </div>
+
+          <div class="hint" style="margin-top:10px">
+            Si la descàrrega falla, gairebé sempre és <b>CORS</b> (canvas “tainted”).
+            En aquest cas, el PNG del mapa no es pot llegir dins el canvas.
+          </div>
+        </div>
+      </details>
+
+      <div class="err" id="err"></div>
+    </section>
+
+    <section class="card">
+      <div class="canvasWrap">
+        <canvas id="c" width="2400" height="1600"></canvas>
       </div>
-      <div style="flex:1">
-        <label>Unitat</label>
-        <input id="unit" placeholder="Ex: NDVI" />
-      </div>
-    </div>
-
-    <label>Paleta (hex separats per coma)</label>
-    <input id="palette" placeholder="Ex: 440154,3b528b,21918c,5ec962,fde725" />
-
-    <div class="row">
-      <div style="flex:1">
-        <label>Escala (km)</label>
-        <input id="scaleKm" placeholder="Ex: 50" />
-      </div>
-      <div style="flex:1">
-        <label>Nom marca</label>
-        <input id="brand" placeholder="Càtedra de la Insularitat" />
-      </div>
-    </div>
-
-    <label>Peu</label>
-    <input id="footer" placeholder="Ex: GEE · Copernicus · Consell Insular" />
-
-    <div class="tiny" style="margin-top:10px;">
-      Si el mapa no carrega o la descàrrega falla, sol ser CORS. Solució: afegir proxy o carregar PNG local (es pot afegir si ho necessites).
-    </div>
-
-    <div class="err" id="err"></div>
-  </section>
-
-  <section class="card">
-    <canvas id="c" width="2400" height="1600"></canvas>
-  </section>
+    </section>
+  </div>
 </main>
 
 <script>
 (function(){
+  // ---------- helpers ----------
+  function $(id){ return document.getElementById(id); }
   function qs(k){ return new URLSearchParams(location.search).get(k); }
-  function setIf(id, v){ if(v!==null && v!==undefined && v!==""){ document.getElementById(id).value = v; } }
   function sanitize(s){ return (s===null||s===undefined) ? "" : String(s); }
+  function setIf(id, v){ if(v!==null && v!==undefined && v!==""){ $(id).value = v; } }
 
-  // ---- Read payload ?p= (preferred from visor) ----
-  var p = qs("p");
-  if (p) {
-    try {
-      var payload = JSON.parse(decodeURIComponent(p));
-      // The visor sends dataUrl, dims, meta (min/max/unit/palette), title/subtitle.
-      setIf("mapUrl", payload.dataUrl || payload.mapUrl || payload.map);
-      setIf("title", payload.title);
-      // Build a helpful subtitle if none provided
-      var sub = payload.subtitle || "";
-      if (!sub && payload.meta) {
-        var m = payload.meta;
-        var parts = [];
-        if (m.mode) parts.push(m.mode);
-        if (m.map) parts.push(m.map);
-        if (m.island) parts.push(m.island);
-        if (m.date) parts.push(m.date);
-        sub = parts.join(" · ");
-      }
-      setIf("subtitle", sub);
-      if (payload.meta) {
-        setIf("vmin", payload.meta.min);
-        setIf("vmax", payload.meta.max);
-        setIf("unit", payload.meta.unit);
-        if (payload.meta.palette && payload.meta.palette.length) {
-          setIf("palette", payload.meta.palette.join(","));
-        }
-      }
-    } catch(e) {
-      // ignore, fall back to classic params
-    }
+  function setErr(msg){
+    var el = $("err");
+    el.style.display = msg ? "block" : "none";
+    el.textContent = msg || "";
+  }
+  function setStatus(html){ $("status").innerHTML = html || ""; }
+
+  function parsePalette(s){
+    if(!s) return ["#440154","#3b528b","#21918c","#5ec962","#fde725"];
+    return String(s).split(",").map(function(x){
+      x = (x||"").trim().replace("#","");
+      if(!x) return null;
+      if(x.length===3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
+      return "#"+x;
+    }).filter(Boolean);
   }
 
-  // ---- Classic params fallback ----
-  setIf("mapUrl", qs("map"));
-  setIf("title", qs("title"));
-  setIf("subtitle", qs("subtitle"));
-  setIf("vmin", qs("min"));
-  setIf("vmax", qs("max"));
-  setIf("unit", qs("unit"));
-  setIf("palette", qs("palette"));
-  setIf("scaleKm", qs("scalekm"));
-  setIf("brand", qs("brand"));
-  setIf("footer", qs("footer"));
+  function slug(s){
+    return String(s||"").toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/[^a-z0-9]+/g,"_")
+      .replace(/^_+|_+$/g,"")
+      .slice(0,90) || "poster";
+  }
 
-  var canvas = document.getElementById("c");
-  var ctx = canvas.getContext("2d");
-  var errEl = document.getElementById("err");
-
-  function clearErr(){ errEl.textContent = ""; }
-  function setErr(s){ errEl.textContent = s || ""; }
-
-  function drawRoundedRect(x,y,w,h,r){
+  // ---------- drawing primitives ----------
+  function drawRoundedRect(ctx,x,y,w,h,r){
     r = Math.min(r, w/2, h/2);
     ctx.beginPath();
     ctx.moveTo(x+r,y);
@@ -165,7 +349,7 @@
     ctx.closePath();
   }
 
-  function drawNorthArrow(x, y, size){
+  function drawNorthArrow(ctx, x, y, size){
     ctx.save();
     ctx.translate(x, y);
     ctx.fillStyle = "#111";
@@ -176,6 +360,7 @@
     ctx.lineTo(-size*0.55, size*0.8);
     ctx.closePath();
     ctx.fill();
+
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.moveTo(0, -size*0.72);
@@ -184,15 +369,16 @@
     ctx.lineTo(-size*0.25, size*0.45);
     ctx.closePath();
     ctx.fill();
+
     ctx.fillStyle = "#111";
-    ctx.font = "600 " + Math.round(size*0.7) + "px system-ui, sans-serif";
+    ctx.font = "800 " + Math.round(size*0.7) + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
-    ctx.fillText("N", 0, -size*1.05);
+    ctx.fillText("N", 0, -size*1.08);
     ctx.restore();
   }
 
-  function drawDroplet(x, y, h){
+  function drawDroplet(ctx, x, y, h){
     var w = h * 0.72;
     ctx.save();
     ctx.translate(x, y);
@@ -206,54 +392,46 @@
     ctx.restore();
   }
 
-  function parsePalette(s){
-    if(!s) return ["#440154","#3b528b","#21918c","#5ec962","#fde725"];
-    return String(s).split(",").map(function(x){
-      x = (x||"").trim().replace("#","");
-      if(!x) return null;
-      if(x.length===3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
-      return "#"+x;
-    }).filter(Boolean);
-  }
-
-  function drawLegend(x,y,w,h, vmin, vmax, unit, palette){
+  function drawLegend(ctx, x,y,w,h, vmin, vmax, unit, palette){
     ctx.save();
-    ctx.globalAlpha = 0.96;
+    ctx.globalAlpha = 0.98;
     ctx.fillStyle = "#fff";
-    drawRoundedRect(x,y,w,h,18);
+    drawRoundedRect(ctx,x,y,w,h,18);
     ctx.fill();
+
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = "rgba(0,0,0,0.08)";
+    ctx.strokeStyle = "rgba(0,0,0,0.10)";
     ctx.lineWidth = 2;
-    drawRoundedRect(x,y,w,h,18);
+    drawRoundedRect(ctx,x,y,w,h,18);
     ctx.stroke();
 
     ctx.fillStyle = "#111";
-    ctx.font = "700 20px system-ui, sans-serif";
+    ctx.font = "800 20px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(unit || "Llegenda", x+16, y+14);
 
-    var barX = x+16, barY = y+46, barW = w-32, barH = 18;
+    var barX = x+16, barY = y+48, barW = w-32, barH = 18;
     var grad = ctx.createLinearGradient(barX,0,barX+barW,0);
-    var stops = palette.length-1;
+    var stops = Math.max(1, palette.length-1);
     for(var i=0;i<palette.length;i++){
-      grad.addColorStop(stops ? (i/stops) : 0, palette[i]);
+      grad.addColorStop(i/stops, palette[i]);
     }
     ctx.fillStyle = grad;
-    drawRoundedRect(barX, barY, barW, barH, 9);
+    drawRoundedRect(ctx,barX,barY,barW,barH,9);
     ctx.fill();
 
     ctx.fillStyle = "#333";
-    ctx.font = "600 14px system-ui, sans-serif";
+    ctx.font = "700 14px system-ui, sans-serif";
     ctx.textBaseline = "top";
+    ctx.textAlign = "left";
     ctx.fillText(sanitize(vmin), barX, barY+barH+10);
     ctx.textAlign = "right";
     ctx.fillText(sanitize(vmax), barX+barW, barY+barH+10);
     ctx.restore();
   }
 
-  function drawScaleBar(x, y, widthPx, label){
+  function drawScaleBar(ctx, x, y, widthPx, label){
     ctx.save();
     ctx.fillStyle = "#111";
     ctx.strokeStyle = "#111";
@@ -262,74 +440,209 @@
     ctx.moveTo(x, y);
     ctx.lineTo(x+widthPx, y);
     ctx.stroke();
+
     ctx.beginPath();
     ctx.moveTo(x, y-8); ctx.lineTo(x, y+8);
     ctx.moveTo(x+widthPx, y-8); ctx.lineTo(x+widthPx, y+8);
     ctx.stroke();
-    ctx.font = "700 14px system-ui, sans-serif";
+
+    ctx.font = "800 14px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillText(label, x+widthPx/2, y-10);
     ctx.restore();
   }
 
+  // ---------- payload / params ----------
+  var initial = {};
+  function loadFromQuery(){
+    // default fields
+    initial = {
+      mapUrl: "",
+      title: "",
+      subtitle: "",
+      vmin: "",
+      vmax: "",
+      unit: "",
+      palette: "",
+      scaleKm: "",
+      scalePx: "",
+      brand: "Càtedra de la Insularitat",
+      footer: "",
+      filename: "poster.png"
+    };
+
+    // preferred: ?p=
+    var p = qs("p");
+    if (p) {
+      try{
+        var payload = JSON.parse(decodeURIComponent(p));
+        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || "";
+        initial.title = payload.title || "Comparador insular";
+        var sub = payload.subtitle || "";
+        if(!sub && payload.meta){
+          var m = payload.meta;
+          var parts = [];
+          if (m.mode) parts.push(m.mode);
+          if (m.map) parts.push(m.map);
+          if (m.island) parts.push(m.island);
+          if (m.date) parts.push(m.date);
+          sub = parts.join(" · ");
+        }
+        initial.subtitle = sub;
+
+        if(payload.meta){
+          initial.vmin = (payload.meta.min!==null && payload.meta.min!==undefined) ? String(payload.meta.min) : "";
+          initial.vmax = (payload.meta.max!==null && payload.meta.max!==undefined) ? String(payload.meta.max) : "";
+          initial.unit = payload.meta.unit || "";
+          if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
+        }
+
+        // nice filename
+        var f = [
+          payload.meta && payload.meta.island ? payload.meta.island : "",
+          payload.subtitle || (payload.meta && payload.meta.map ? payload.meta.map : ""),
+          payload.meta && payload.meta.date ? payload.meta.date : "",
+          payload.meta && payload.meta.mode ? payload.meta.mode : ""
+        ].filter(Boolean).join("_");
+
+        initial.filename = slug(f || payload.title || "poster") + ".png";
+      }catch(e){
+        // ignore, fallback to classic
+      }
+    }
+
+    // classic fallback params
+    if(!initial.mapUrl) initial.mapUrl = qs("map") || "";
+    if(!initial.title) initial.title = qs("title") || initial.title;
+    if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
+    if(!initial.vmin) initial.vmin = qs("min") || "";
+    if(!initial.vmax) initial.vmax = qs("max") || "";
+    if(!initial.unit) initial.unit = qs("unit") || "";
+    if(!initial.palette) initial.palette = qs("palette") || "";
+    initial.scaleKm = qs("scalekm") || "";
+    initial.scalePx = qs("scalepx") || "";
+    initial.brand = qs("brand") || initial.brand;
+    initial.footer = qs("footer") || "";
+
+    // apply
+    setIf("mapUrl", initial.mapUrl);
+    setIf("title", initial.title);
+    setIf("subtitle", initial.subtitle);
+    setIf("vmin", initial.vmin);
+    setIf("vmax", initial.vmax);
+    setIf("unit", initial.unit);
+    setIf("palette", initial.palette);
+    setIf("scaleKm", initial.scaleKm);
+    setIf("scalePx", initial.scalePx);
+    setIf("brand", initial.brand);
+    setIf("footer", initial.footer);
+
+    $("fn").textContent = initial.filename || "";
+  }
+
+  // ---------- render ----------
+  var canvas = $("c");
+  var ctx = canvas.getContext("2d");
+
+  function setCanvasSize(outW, outH){
+    // crisp output using DPR
+    var dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    canvas.width = outW * dpr;
+    canvas.height = outH * dpr;
+    canvas.style.width = outW + "px";
+    canvas.style.height = (outH * (outW/canvas.clientWidth ? 1 : 1)) + "px"; // harmless
+    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
+  }
+
   function render(){
-    clearErr();
+    setErr("");
+    $("btnRender").disabled = true;
+    setStatus('<span class="spin"></span>Generant...');
 
-    var mapUrl = document.getElementById("mapUrl").value.trim();
-    if(!mapUrl){ setErr("Falta l'URL del mapa (mapUrl)."); return; }
+    var mapUrl = $("mapUrl").value.trim();
+    if(!mapUrl){
+      setErr("Falta l'URL del mapa (PNG).");
+      $("btnRender").disabled = false;
+      setStatus("");
+      return;
+    }
 
-    var title = document.getElementById("title").value.trim();
-    var subtitle = document.getElementById("subtitle").value.trim();
-    var vmin = document.getElementById("vmin").value.trim();
-    var vmax = document.getElementById("vmax").value.trim();
-    var unit = document.getElementById("unit").value.trim();
-    var palette = parsePalette(document.getElementById("palette").value);
-    var scaleKm = document.getElementById("scaleKm").value.trim();
-    var brand = document.getElementById("brand").value.trim() || "Càtedra de la Insularitat";
-    var footer = document.getElementById("footer").value.trim();
+    var posterW = parseInt($("posterW").value, 10) || 3200;
+    var pad = parseInt($("padPx").value, 10) || 60;
 
-    var W = canvas.width, H = canvas.height;
-    var pad = 60;
+    var title = $("title").value.trim() || "Pòster";
+    var subtitle = ($("subtitle").value || "").trim();
+    var vmin = $("vmin").value.trim();
+    var vmax = $("vmax").value.trim();
+    var unit = $("unit").value.trim();
+    var palette = parsePalette($("palette").value);
+    var scaleKm = $("scaleKm").value.trim();
+    var scalePx = parseFloat($("scalePx").value.trim());
+    if(!isFinite(scalePx) || scalePx<=0) scalePx = 180;
+    var brand = $("brand").value.trim() || "Càtedra de la Insularitat";
+    var footer = $("footer").value.trim();
 
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0,0,W,H);
+    var showLegend = $("showLegend").checked;
+    var showNorth  = $("showNorth").checked;
+    var showScale  = $("showScale").checked;
+    var showFooter = $("showFooter").checked;
+
+    // layout constants (in CSS pixels)
+    var headerH = 150;
+    var subtitleMaxLines = 3;
+    var mapTop = 240;
 
     var img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = function(){
-      // Header band
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0,0,W,140);
-      ctx.strokeStyle = "rgba(0,0,0,0.06)";
-      ctx.beginPath(); ctx.moveTo(0,140); ctx.lineTo(W,140); ctx.stroke();
 
-      drawDroplet(pad, 70, 44);
+    img.onload = function(){
+      // compute poster height by fitting map area with some breathing room
+      // Keep a nice, stable look: map area dominates, footer fixed.
+      var outW = posterW;
+      var outH = Math.round(outW * 0.66); // base ratio
+      outH = Math.max(1600, Math.min(2400, outH)); // clamp a bit
+      setCanvasSize(outW, outH);
+
+      var W = outW, H = outH;
+
+      // bg
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0,0,W,H);
+
+      // header band
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0,0,W,headerH);
+      ctx.strokeStyle = "rgba(0,0,0,0.06)";
+      ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
+
+      // brand mark + brand
+      drawDroplet(ctx, pad, 72, 44);
       ctx.fillStyle = "#111";
-      ctx.font = "800 22px system-ui, sans-serif";
+      ctx.font = "900 22px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(brand, pad+42, 70);
+      ctx.fillText(brand, pad+42, 72);
 
+      // title + subtitle
       ctx.fillStyle = "#111";
-      ctx.font = "900 28px system-ui, sans-serif";
+      ctx.font = "950 30px system-ui, sans-serif";
       ctx.textBaseline = "top";
-      ctx.fillText(title || "Pòster", pad, 150);
+      ctx.fillText(title, pad, headerH + 10);
 
-      ctx.font = "600 16px system-ui, sans-serif";
-      ctx.fillStyle = "#333";
-      var lines = subtitle ? subtitle.split("\n").slice(0,3) : [];
+      ctx.font = "650 16px system-ui, sans-serif";
+      ctx.fillStyle = "#374151";
+      var lines = subtitle ? subtitle.split("\n").slice(0, subtitleMaxLines) : [];
       for(var i=0;i<lines.length;i++){
-        ctx.fillText(lines[i], pad, 188 + i*20);
+        ctx.fillText(lines[i], pad, headerH + 50 + i*20);
       }
 
-      // Map frame region
-      var mapTop = 240;
+      // map frame region
       var mapX = pad;
       var mapY = mapTop;
       var mapW = W - pad*2;
-      var mapH = H - mapTop - 120;
+      var mapH = H - mapTop - (showFooter ? 92 : 50);
 
       // aspect fit
       var ar = img.width / img.height;
@@ -347,76 +660,103 @@
         dy = mapY;
       }
 
+      // frame
       ctx.fillStyle = "#fff";
-      drawRoundedRect(mapX, mapY, mapW, mapH, 22);
+      drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.10)";
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
       ctx.lineWidth = 2;
-      drawRoundedRect(mapX, mapY, mapW, mapH, 22);
+      drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.stroke();
 
+      // clip and draw map
       ctx.save();
-      drawRoundedRect(mapX, mapY, mapW, mapH, 22);
+      drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.clip();
       ctx.drawImage(img, dx, dy, drawW, drawH);
       ctx.restore();
 
-      drawNorthArrow(mapX + mapW - 70, mapY + 85, 26);
-
-      if(scaleKm){
+      // overlays
+      if(showNorth){
+        drawNorthArrow(ctx, mapX + mapW - 70, mapY + 85, 26);
+      }
+      if(showScale && scaleKm){
         var km = Number(scaleKm);
         if(isFinite(km) && km>0){
-          var scalepx = Number(qs("scalepx") || 180);
-          if(!isFinite(scalepx) || scalepx<=0) scalepx = 180;
-          drawScaleBar(mapX + 28, mapY + mapH - 28, scalepx, km + " km");
+          drawScaleBar(ctx, mapX + 28, mapY + mapH - 28, scalePx, km + " km");
         }
       }
+      if(showLegend){
+        var legW = Math.min(460, Math.round(mapW * 0.36));
+        var legH = 112;
+        var legX = mapX + mapW - legW - 22;
+        var legY = mapY + mapH - legH - 22;
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette);
+      }
 
-      // Legend card
-      var legW = 420, legH = 110;
-      var legX = mapX + mapW - legW - 22;
-      var legY = mapY + mapH - legH - 22;
-      drawLegend(legX, legY, legW, legH, vmin, vmax, unit, palette);
+      // footer
+      if(showFooter){
+        ctx.fillStyle = "#4b5563";
+        ctx.font = "650 13px system-ui, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(footer || "", pad, H - 36);
 
-      // Footer
-      ctx.fillStyle = "#444";
-      ctx.font = "600 13px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(footer || "", pad, H - 40);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillText("Generat amb GEE Poster Composer", W - pad, H - 36);
+      }
 
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#777";
-      ctx.fillText("Generat amb GEE Poster Composer", W - pad, H - 40);
+      $("btnRender").disabled = false;
+      setStatus("✅ Fet");
     };
 
     img.onerror = function(){
-      setErr("No s'ha pogut carregar el PNG del mapa.\n\n- Revisa que l'URL sigui correcte.\n- Pot ser CORS.\n\nProva d'obrir el dataUrl directament en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.");
+      $("btnRender").disabled = false;
+      setStatus("");
+      setErr(
+        "No s'ha pogut carregar el PNG del mapa.\n\n" +
+        "• Revisa que l'URL sigui correcte i no hagi expirat.\n" +
+        "• Pot ser CORS: si el navegador bloqueja el PNG, el canvas no pot exportar.\n\n" +
+        "Prova d'obrir l'URL del mapa en una pestanya nova: si no es veu, l'URL és invàlid o expirat."
+      );
     };
 
     img.src = mapUrl;
   }
 
   function download(){
-    clearErr();
+    setErr("");
     try{
+      var name = $("fn").textContent || "poster.png";
       var a = document.createElement("a");
-      a.download = "poster.png";
+      a.download = name;
       a.href = canvas.toDataURL("image/png");
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch(e){
-      setErr("No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n" + e);
+    }catch(e){
+      setErr(
+        "No s'ha pogut exportar el canvas a PNG.\n\n" +
+        "Això sol ser 'tainted canvas' per CORS.\nDetall:\n" + e
+      );
     }
   }
 
-  document.getElementById("btnRender").addEventListener("click", render);
-  document.getElementById("btnDownload").addEventListener("click", download);
+  // ---------- wire ----------
+  $("btnRender").addEventListener("click", render);
+  $("btnDownload").addEventListener("click", download);
+  $("btnReset").addEventListener("click", function(){
+    loadFromQuery();
+    setErr("");
+    setStatus("");
+  });
 
-  // Auto-render if payload exists
-  if (qs("p") || qs("map")) setTimeout(render, 50);
+  // auto-init
+  loadFromQuery();
+  if (qs("p") || qs("map")) setTimeout(render, 60);
 })();
 </script>
 </body>
 </html>
+
