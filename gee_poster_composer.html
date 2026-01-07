@@ -29,7 +29,7 @@
       backdrop-filter: blur(10px);
       border-bottom:1px solid var(--line);
     }
-    .wrap{ max-width: 1280px; margin:0 auto; padding: 14px 16px; }
+    .wrap{ max-width: 1400px; margin:0 auto; padding: 14px 16px; }
     .top{
       display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     }
@@ -55,13 +55,14 @@
     button.secondary{ background:var(--soft); color:var(--text); }
     button:disabled{ opacity:0.55; cursor:not-allowed; }
 
+    /* 🔥 més espai al preview: panell esquerre més estret */
     main .grid{
       display:grid;
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 340px 1fr;
       gap:14px;
-      align-items:start;
+      align-items:stretch; /* clau perquè el panell dret pugui agafar alçada */
       padding: 14px 16px;
-      max-width: 1280px;
+      max-width: 1400px;
       margin:0 auto;
     }
     @media (max-width: 980px){
@@ -146,27 +147,23 @@
       flex-wrap:wrap;
     }
 
-    /* ✅ PREVIEW: mai retallat; si no cap, scroll */
-    /* PREVIEW GRAN: ocupa alçada i amplada disponibles */
-  .canvasWrap{
-    padding: 12px;
-    height: calc(100vh - 140px); /* header + marges */
-    overflow: auto;
-    display: flex;
-    align-items: center;        /* centra verticalment quan sobra espai */
-    justify-content: center;    /* centra horitzontalment */
-  }
-
-  canvas{
-    width: 100%;               /* 👈 clau: que ompli el panell dret */
-    height: auto;              /* manté proporció */
-    max-width: 1100px;         /* opcional: límit perquè no sigui “massa” en pantalles enormes */
-    background:#fff;
-    border:1px solid var(--line);
-    border-radius: var(--radius);
-    display:block;
-  }
-
+    /* ✅ PREVIEW GRAN i “fit” a pantalla */
+    .canvasWrap{
+      padding: 12px;
+      height: calc(100vh - 140px); /* header + marges */
+      overflow:auto;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    canvas{
+      width:100%;     /* clau: omple el panell dret */
+      height:auto;    /* conserva proporció */
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      display:block;
+    }
 
     .mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; }
     .spin{
@@ -309,7 +306,6 @@
 
 <script>
 (function(){
-  // ---------- helpers ----------
   function $(id){ return document.getElementById(id); }
   function qs(k){ return new URLSearchParams(location.search).get(k); }
   function sanitize(s){ return (s===null||s===undefined) ? "" : String(s); }
@@ -344,7 +340,6 @@
       .slice(0,90) || "poster";
   }
 
-  // ---------- drawing primitives ----------
   function drawRoundedRect(ctx,x,y,w,h,r){
     r = Math.min(r, w/2, h/2);
     ctx.beginPath();
@@ -460,7 +455,6 @@
     ctx.restore();
   }
 
-  // ---------- payload / params ----------
   var initial = {};
   function loadFromQuery(){
     initial = {
@@ -510,12 +504,9 @@
           payload.meta && payload.meta.mode ? payload.meta.mode : ""
         ].filter(Boolean).join("_");
         initial.filename = slug(f || payload.title || "poster") + ".png";
-      }catch(e){
-        // ignore
-      }
+      }catch(e){}
     }
 
-    // fallback ?map=...
     if(!initial.mapUrl) initial.mapUrl = qs("map") || "";
     if(!initial.title) initial.title = qs("title") || initial.title;
     if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
@@ -541,7 +532,6 @@
     $("fn").textContent = initial.filename || "";
   }
 
-  // ---------- render ----------
   var canvas = $("c");
   var ctx = canvas.getContext("2d");
 
@@ -578,9 +568,7 @@
     var scalePx = parseFloat($("scalePx").value.trim());
     if(!isFinite(scalePx) || scalePx<=0) scalePx = 180;
 
-    // ✅ Marca fixa, no editable
-    var brand = "Càtedra de la Insularitat";
-
+    var brand = "Càtedra de la Insularitat"; // fixa
     var footer = $("footer").value.trim();
 
     var showLegend = $("showLegend").checked;
