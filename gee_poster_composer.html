@@ -147,24 +147,26 @@
     }
 
     /* ✅ PREVIEW: mai retallat; si no cap, scroll */
-    .canvasWrap{
-      padding: 12px;
-      display:flex;
-      justify-content:center;
-      align-items:flex-start;
-      overflow:auto;
-      max-height: calc(100vh - 140px); /* header + marges */
-    }
-    canvas{
-      width:auto;
-      height:auto;
-      max-width: 100%;
-      max-height: calc(100vh - 170px);
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius: var(--radius);
-      display:block;
-    }
+    /* PREVIEW GRAN: ocupa alçada i amplada disponibles */
+  .canvasWrap{
+    padding: 12px;
+    height: calc(100vh - 140px); /* header + marges */
+    overflow: auto;
+    display: flex;
+    align-items: center;        /* centra verticalment quan sobra espai */
+    justify-content: center;    /* centra horitzontalment */
+  }
+
+  canvas{
+    width: 100%;               /* 👈 clau: que ompli el panell dret */
+    height: auto;              /* manté proporció */
+    max-width: 1100px;         /* opcional: límit perquè no sigui “massa” en pantalles enormes */
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius: var(--radius);
+    display:block;
+  }
+
 
     .mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:11px; }
     .spin{
