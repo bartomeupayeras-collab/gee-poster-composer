@@ -146,10 +146,20 @@
       flex-wrap:wrap;
     }
 
-    .canvasWrap{ padding: 12px; }
+    /* ✅ PREVIEW: mai retallat; si no cap, scroll */
+    .canvasWrap{
+      padding: 12px;
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      overflow:auto;
+      max-height: calc(100vh - 140px); /* header + marges */
+    }
     canvas{
-      width:100%;
+      width:auto;
       height:auto;
+      max-width: 100%;
+      max-height: calc(100vh - 170px);
       background:#fff;
       border:1px solid var(--line);
       border-radius: var(--radius);
@@ -194,7 +204,6 @@
   <div class="grid">
     <section class="card">
       <div class="pad">
-
         <label>Mapa (PNG) *</label>
         <input id="mapUrl" placeholder="getThumbURL del mapa base (PNG)" />
 
@@ -233,7 +242,7 @@
       <details id="adv">
         <summary>
           <span>Detalls (avançat)</span>
-          <span class="mono">títol · llegenda · marca</span>
+          <span class="mono">títol · llegenda</span>
         </summary>
         <div class="pad">
           <label>Títol</label>
@@ -302,7 +311,11 @@
   function $(id){ return document.getElementById(id); }
   function qs(k){ return new URLSearchParams(location.search).get(k); }
   function sanitize(s){ return (s===null||s===undefined) ? "" : String(s); }
-  function setIf(id, v){ if(v!==null && v!==undefined && v!==""){ $(id).value = v; } }
+  function setIf(id, v){
+    var el = $(id);
+    if(!el) return;
+    if(v!==null && v!==undefined && v!==""){ el.value = v; }
+  }
 
   function setErr(msg){
     var el = $("err");
@@ -448,7 +461,6 @@
   // ---------- payload / params ----------
   var initial = {};
   function loadFromQuery(){
-    // default fields
     initial = {
       mapUrl: "",
       title: "",
@@ -459,18 +471,17 @@
       palette: "",
       scaleKm: "",
       scalePx: "",
-      brand: "Càtedra de la Insularitat",
       footer: "",
       filename: "poster.png"
     };
 
-    // preferred: ?p=
     var p = qs("p");
     if (p) {
       try{
         var payload = JSON.parse(decodeURIComponent(p));
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || "";
         initial.title = payload.title || "Comparador insular";
+
         var sub = payload.subtitle || "";
         if(!sub && payload.meta){
           var m = payload.meta;
@@ -490,21 +501,19 @@
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
         }
 
-        // nice filename
         var f = [
           payload.meta && payload.meta.island ? payload.meta.island : "",
           payload.subtitle || (payload.meta && payload.meta.map ? payload.meta.map : ""),
           payload.meta && payload.meta.date ? payload.meta.date : "",
           payload.meta && payload.meta.mode ? payload.meta.mode : ""
         ].filter(Boolean).join("_");
-
         initial.filename = slug(f || payload.title || "poster") + ".png";
       }catch(e){
-        // ignore, fallback to classic
+        // ignore
       }
     }
 
-    // classic fallback params
+    // fallback ?map=...
     if(!initial.mapUrl) initial.mapUrl = qs("map") || "";
     if(!initial.title) initial.title = qs("title") || initial.title;
     if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
@@ -514,10 +523,8 @@
     if(!initial.palette) initial.palette = qs("palette") || "";
     initial.scaleKm = qs("scalekm") || "";
     initial.scalePx = qs("scalepx") || "";
-    initial.brand = qs("brand") || initial.brand;
     initial.footer = qs("footer") || "";
 
-    // apply
     setIf("mapUrl", initial.mapUrl);
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
@@ -527,7 +534,6 @@
     setIf("palette", initial.palette);
     setIf("scaleKm", initial.scaleKm);
     setIf("scalePx", initial.scalePx);
-    setIf("brand", initial.brand);
     setIf("footer", initial.footer);
 
     $("fn").textContent = initial.filename || "";
@@ -538,13 +544,10 @@
   var ctx = canvas.getContext("2d");
 
   function setCanvasSize(outW, outH){
-    // crisp output using DPR
     var dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
     canvas.width = outW * dpr;
     canvas.height = outH * dpr;
-    canvas.style.width = outW + "px";
-    canvas.style.height = (outH * (outW/canvas.clientWidth ? 1 : 1)) + "px"; // harmless
-    ctx.setTransform(dpr,0,0,dpr,0,0); // draw in CSS pixels
+    ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
   function render(){
@@ -572,7 +575,10 @@
     var scaleKm = $("scaleKm").value.trim();
     var scalePx = parseFloat($("scalePx").value.trim());
     if(!isFinite(scalePx) || scalePx<=0) scalePx = 180;
-    var brand = $("brand").value.trim() || "Càtedra de la Insularitat";
+
+    // ✅ Marca fixa, no editable
+    var brand = "Càtedra de la Insularitat";
+
     var footer = $("footer").value.trim();
 
     var showLegend = $("showLegend").checked;
@@ -580,7 +586,6 @@
     var showScale  = $("showScale").checked;
     var showFooter = $("showFooter").checked;
 
-    // layout constants (in CSS pixels)
     var headerH = 150;
     var subtitleMaxLines = 3;
     var mapTop = 240;
@@ -589,27 +594,22 @@
     img.crossOrigin = "anonymous";
 
     img.onload = function(){
-      // compute poster height by fitting map area with some breathing room
-      // Keep a nice, stable look: map area dominates, footer fixed.
       var outW = posterW;
-      var outH = Math.round(outW * 0.66); // base ratio
-      outH = Math.max(1600, Math.min(2400, outH)); // clamp a bit
+      var outH = Math.round(outW * 0.66);
+      outH = Math.max(1600, Math.min(2400, outH));
       setCanvasSize(outW, outH);
 
       var W = outW, H = outH;
 
-      // bg
       ctx.clearRect(0,0,W,H);
       ctx.fillStyle = "#fff";
       ctx.fillRect(0,0,W,H);
 
-      // header band
       ctx.fillStyle = "#fff";
       ctx.fillRect(0,0,W,headerH);
       ctx.strokeStyle = "rgba(0,0,0,0.06)";
       ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
-      // brand mark + brand
       drawDroplet(ctx, pad, 72, 44);
       ctx.fillStyle = "#111";
       ctx.font = "900 22px system-ui, sans-serif";
@@ -617,7 +617,6 @@
       ctx.textBaseline = "middle";
       ctx.fillText(brand, pad+42, 72);
 
-      // title + subtitle
       ctx.fillStyle = "#111";
       ctx.font = "950 30px system-ui, sans-serif";
       ctx.textBaseline = "top";
@@ -630,13 +629,11 @@
         ctx.fillText(lines[i], pad, headerH + 50 + i*20);
       }
 
-      // map frame region
       var mapX = pad;
       var mapY = mapTop;
       var mapW = W - pad*2;
       var mapH = H - mapTop - (showFooter ? 92 : 50);
 
-      // aspect fit
       var ar = img.width / img.height;
       var targetAr = mapW / mapH;
       var drawW, drawH, dx, dy;
@@ -652,7 +649,6 @@
         dy = mapY;
       }
 
-      // frame
       ctx.fillStyle = "#fff";
       drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.fill();
@@ -661,14 +657,12 @@
       drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.stroke();
 
-      // clip and draw map
       ctx.save();
       drawRoundedRect(ctx, mapX, mapY, mapW, mapH, 22);
       ctx.clip();
       ctx.drawImage(img, dx, dy, drawW, drawH);
       ctx.restore();
 
-      // overlays
       if(showNorth){
         drawNorthArrow(ctx, mapX + mapW - 70, mapY + 85, 26);
       }
@@ -686,7 +680,6 @@
         drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette);
       }
 
-      // footer
       if(showFooter){
         ctx.fillStyle = "#4b5563";
         ctx.font = "650 13px system-ui, sans-serif";
@@ -735,7 +728,6 @@
     }
   }
 
-  // ---------- wire ----------
   $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
   $("btnReset").addEventListener("click", function(){
@@ -744,7 +736,6 @@
     setStatus("");
   });
 
-  // auto-init
   loadFromQuery();
   if (qs("p") || qs("map")) setTimeout(render, 60);
 })();
