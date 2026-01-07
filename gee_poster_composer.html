@@ -569,14 +569,24 @@
       ctx.fillText(lines[i], pad, Math.round(252*S) + i*Math.round(28*S));
     }
 
-    // map frame region
-    const mapTop = headerH + Math.round(40*S); // bigger gap vs subtitle
-    const mapX = pad;
-    const mapY = mapTop;
-    const mapW = W - pad*2;
-    const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
+    // ===========================
+      // Layout blocks (poster)
+      // ===========================
+      const headerBlockH = Math.round(240*S);   // logos + marca
+      const titleBlockH  = Math.round(210*S);   // títol + subtítol
+      const footerH2     = showFooter ? Math.round(95*S) : Math.round(60*S);
 
-    // aspect fit map
+      // Map dominates but not too much (≈62% of height)
+      const mapH = Math.round(H * 0.62);
+      const mapX = pad;
+      const mapW = W - pad*2;
+      const mapY = headerBlockH + titleBlockH;
+
+      // Keep within canvas (in case of small heights)
+      const maxMapH = H - mapY - footerH2;
+      const mapH2 = Math.max(Math.round(520*S), Math.min(mapH, maxMapH));
+
+// aspect fit map
     const ar = img.width / img.height;
     const targetAr = mapW / mapH;
     let drawW, drawH, dx, dy;
@@ -584,17 +594,15 @@
         drawW = mapW;
         drawH = mapW / ar;
         dx = mapX;
-        dy = mapY + (mapH - drawH)/2;
+        dy = mapY + (mapH2 - drawH)/2;
       } else {
-        drawH = mapH;
-        drawW = mapH * ar;
+        drawH = mapH2;
+        drawW = mapH2 * ar;
         dx = mapX + (mapW - drawW)/2;
         dy = mapY;
       }
       // Visual bias: move the map slightly upward to avoid covering the main feature with the legend.
-      dy -= mapH * 0.08;
-
-    // frame + clip
+// frame + clip
     ctx.fillStyle="#fff";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
@@ -616,14 +624,14 @@
     if(showScale && scaleKm){
       const km = Number(scaleKm);
       if(isFinite(km) && km>0){
-        drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
+        drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH22 - Math.round(34*S), scalePx, km + " km", S);
       }
     }
     if(showLegend){
-        const legW = Math.min(Math.round(980*S), Math.round(mapW * 0.52));
-        const legH = Math.round(280*S);
+        const legW = Math.min(Math.round(1040*S), Math.round(mapW * 0.50));
+        const legH = Math.round(320*S);
         const legX = mapX + mapW - legW - Math.round(26*S);
-        const legY = mapY + mapH - legH - Math.round(26*S);
+        const legY = mapY + mapH2 - legH - Math.round(26*S);
         drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
       }
 
