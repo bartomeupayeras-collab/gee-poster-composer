@@ -331,42 +331,60 @@
     ctx.fillText("N",0,-size*1.08);
     ctx.restore();
   }
-  function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
+  function drawLegend(ctx, x,y,w,h, vmin, vmax, unit, palette, S){
+    // Tight legend card (no wasted whitespace)
     ctx.save();
-    ctx.globalAlpha=.98;
-    ctx.fillStyle="#fff";
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    const pad = Math.round(22*S);
+    const r = Math.round(18*S);
+
+    // Card
+    ctx.globalAlpha = 0.98;
+    ctx.fillStyle = "#fff";
+    drawRoundedRect(ctx,x,y,w,h,r);
     ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.strokeStyle="rgba(0,0,0,0.10)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(0,0,0,0.12)";
+    ctx.lineWidth = Math.max(1, Math.round(2*S));
+    drawRoundedRect(ctx,x,y,w,h,r);
     ctx.stroke();
 
-    ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(20*S)+"px system-ui, sans-serif";
-    ctx.textAlign="left";
-    ctx.textBaseline="top";
-    ctx.fillText(unit || t("legend"), x+Math.round(16*S), y+Math.round(14*S));
+    // Title
+    const titleY = y + pad;
+    ctx.fillStyle = "#111";
+    ctx.font = "900 " + Math.round(40*S) + "px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    const title = unit && String(unit).trim() ? String(unit).trim() : t("legend");
+    ctx.fillText(title, x + pad, titleY);
 
-    const barX=x+Math.round(16*S), barY=y+Math.round(50*S), barW=w-Math.round(32*S), barH=Math.round(18*S);
-    const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
-    const stops=Math.max(1,palette.length-1);
-    for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
-    ctx.fillStyle=grad;
-    drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(9*S));
+    // Bar
+    const barY = titleY + Math.round(56*S);
+    const barH = Math.round(28*S);
+    const barX = x + pad;
+    const barW = w - pad*2;
+
+    const grad = ctx.createLinearGradient(barX,0,barX+barW,0);
+    const stops = Math.max(1, palette.length-1);
+    for(let i=0;i<palette.length;i++){
+      grad.addColorStop(i/stops, palette[i]);
+    }
+    ctx.fillStyle = grad;
+    drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(10*S));
     ctx.fill();
 
-    ctx.fillStyle="#333";
-    ctx.font="800 "+Math.round(14*S)+"px system-ui, sans-serif";
-    ctx.textBaseline="top";
-    ctx.textAlign="left";
-    ctx.fillText(sanitize(vmin), barX, barY+barH+Math.round(10*S));
-    ctx.textAlign="right";
-    ctx.fillText(sanitize(vmax), barX+barW, barY+barH+Math.round(10*S));
+    // Min/Max labels
+    ctx.fillStyle = "#111";
+    ctx.font = "900 " + Math.round(30*S) + "px system-ui, sans-serif";
+    ctx.textBaseline = "top";
+    ctx.textAlign = "left";
+    ctx.fillText(sanitize(vmin), barX, barY + barH + Math.round(14*S));
+    ctx.textAlign = "right";
+    ctx.fillText(sanitize(vmax), barX + barW, barY + barH + Math.round(14*S));
+
     ctx.restore();
   }
-  function drawScaleBar(ctx,x,y,widthPx,label,S){
+
+function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
     ctx.strokeStyle="#111";
@@ -622,8 +640,8 @@
       }
     }
     if(showLegend){
-        const legW = Math.min(Math.round(1180*S*K), Math.round(mapW * 0.50));
-        const legH = Math.round(340*S*K);
+        const legW = Math.min(Math.round(920*S*K), Math.round(mapW * 0.42));
+        const legH = Math.round(190*S*K);
         const legX = mapX + mapW - legW - Math.round(28*S*K);
         const legY = mapY + mapH - legH - Math.round(28*S*K);
         drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S*K);
