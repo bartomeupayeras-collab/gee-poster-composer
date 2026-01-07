@@ -34,8 +34,8 @@
       display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     }
     .title{ display:flex; align-items:center; gap:12px; min-width: 260px; }
-    .brandMarks{ display:flex; align-items:center; gap:14px; }
-    .brandMarks img{ height: 44px; width:auto; display:block; }
+    .brandMarks{ display:flex; align-items:center; gap:18px; }
+    .brandMarks img{ height: 62px; width:auto; display:block; }
     h1{ font-size:14px; margin:0; letter-spacing:.2px; }
     .sub{ font-size:12px; color:var(--muted); margin-top:2px; }
     .btns{ display:flex; gap:10px; flex-wrap:wrap; }
@@ -378,7 +378,7 @@
     ctx.stroke();
 
     ctx.fillStyle = "#111";
-    ctx.font = "800 " + Math.round(24*S) + "px system-ui, sans-serif";
+    ctx.font = "800 " + Math.round(32*S) + "px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     ctx.fillText(unit || "Llegenda", x+Math.round(16*S), y+Math.round(14*S));
@@ -386,7 +386,7 @@
     const barX = x+Math.round(16*S);
     const barY = y+Math.round(52*S);
     const barW = w-Math.round(32*S);
-    const barH = Math.round(18*S);
+    const barH = Math.round(24*S);
 
     const grad = ctx.createLinearGradient(barX,0,barX+barW,0);
     const stops = Math.max(1, palette.length-1);
@@ -396,7 +396,7 @@
     ctx.fill();
 
     ctx.fillStyle = "#333";
-    ctx.font = "700 " + Math.round(16*S) + "px system-ui, sans-serif";
+    ctx.font = "700 " + Math.round(22*S) + "px system-ui, sans-serif";
     ctx.textBaseline = "top";
     ctx.textAlign = "left";
     ctx.fillText(sanitize(vmin), barX, barY+barH+Math.round(10*S));
@@ -420,7 +420,7 @@
     ctx.moveTo(x+widthPx, y-Math.round(8*S)); ctx.lineTo(x+widthPx, y+Math.round(8*S));
     ctx.stroke();
 
-    ctx.font = "800 " + Math.round(16*S) + "px system-ui, sans-serif";
+    ctx.font = "800 " + Math.round(20*S) + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "bottom";
     ctx.fillText(label, x+widthPx/2, y-Math.round(10*S));
@@ -589,7 +589,7 @@
 
     // Escalat global segons amplada del pòster
     let S = posterW / 2400;
-    S = Math.max(1.0, Math.min(1.7, S)); // 2400 -> 1.0, 3200 -> 1.33, 4000 -> 1.67 (cap a 1.7)
+    S = Math.max(1.0, Math.min(2.0, S)); // 2400 -> 1.0, 3200 -> 1.33, 4000 -> 1.67 (cap a 1.7)
 
     let pad = parseInt($("padPx").value, 10) || 60;
     pad = Math.round(pad * S);
@@ -612,9 +612,9 @@
     const showScale  = $("showScale").checked;
     const showFooter = $("showFooter").checked;
 
-    const headerH = Math.round(160*S);
+    const headerH = Math.round(200*S);
     const subtitleMaxLines = 3;
-    const mapTop = Math.round(260*S);
+    const mapTop = Math.round(320*S);
 
     let img;
     try {
@@ -649,27 +649,27 @@
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
     // Logos + brand text
-    const logoH = Math.round(68*S);
+    const logoH = Math.round(92*S);
     const logosY = Math.round((headerH - logoH) / 2);
     const logosEndX = drawHeaderLogos(ctx, pad, logosY, S, logoH);
 
     ctx.fillStyle = "#111";
-    ctx.font = "900 " + Math.round(26*S) + "px system-ui, sans-serif";
+    ctx.font = "900 " + Math.round(36*S) + "px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(BRAND_TEXT, logosEndX, logosY + Math.round(logoH/2));
 
     // Title + subtitle
     ctx.fillStyle = "#111";
-    ctx.font = "950 " + Math.round(44*S) + "px system-ui, sans-serif";
+    ctx.font = "950 " + Math.round(60*S) + "px system-ui, sans-serif";
     ctx.textBaseline = "top";
-    ctx.fillText(title, pad, headerH + Math.round(10*S));
+    ctx.fillText(title, pad, headerH + Math.round(14*S));
 
-    ctx.font = "650 " + Math.round(22*S) + "px system-ui, sans-serif";
+    ctx.font = "650 " + Math.round(30*S) + "px system-ui, sans-serif";
     ctx.fillStyle = "#374151";
     const lines = subtitle ? subtitle.split("\n").slice(0, subtitleMaxLines) : [];
     for(let i=0;i<lines.length;i++){
-      ctx.fillText(lines[i], pad, headerH + Math.round(64*S) + i*Math.round(26*S));
+      ctx.fillText(lines[i], pad, headerH + Math.round(90*S) + i*Math.round(36*S));
     }
 
     // Map frame region
@@ -791,4 +791,3 @@
 </script>
 </body>
 </html>
-
