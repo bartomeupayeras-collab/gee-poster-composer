@@ -47,8 +47,21 @@
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}
     .spin{display:inline-block;width:14px;height:14px;border-radius:999px;border:2px solid rgba(0,0,0,.15);border-top-color:rgba(0,0,0,.7);animation:r .7s linear infinite;vertical-align:-2px;margin-right:8px}
     @keyframes r{to{transform:rotate(360deg)}}
-    .canvasWrap{padding:12px}
-    canvas{width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:var(--radius);display:block}
+    .canvasWrap{
+      padding: 12px;
+      height: calc(100vh - 120px);
+      min-height: 520px;
+      overflow:auto;
+      display:block;
+    }
+    canvas{
+      width:100%;
+      height:auto;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius: var(--radius);
+      display:block;
+    }
   </style>
 </head>
 <body>
@@ -673,3 +686,4 @@
 </script>
 </body>
 </html>
+
