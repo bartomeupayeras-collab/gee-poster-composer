@@ -16,7 +16,7 @@
     .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .brandRow{display:flex;align-items:center;gap:14px;min-width:280px}
     .logos{display:flex;align-items:center;gap:12px}
-    .logos img{height:34px;width:auto;display:block;}
+    .logos img{height: 48px;width:auto;display:block;}
     .hgroup h1{margin:0;font-size:16px;letter-spacing:.2px}
     .hgroup .sub{margin-top:2px;font-size:12px;color:var(--muted)}
     .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -594,16 +594,18 @@
     const targetAr = mapW / mapH;
     let drawW, drawH, dx, dy;
     if(ar > targetAr){
-      drawW = mapW;
-      drawH = mapW / ar;
-      dx = mapX;
-      dy = mapY + (mapH - drawH)/2;
-    } else {
-      drawH = mapH;
-      drawW = mapH * ar;
-      dx = mapX + (mapW - drawW)/2;
-      dy = mapY;
-    }
+        drawW = mapW;
+        drawH = mapW / ar;
+        dx = mapX;
+        dy = mapY + (mapH - drawH)/2;
+      } else {
+        drawH = mapH;
+        drawW = mapH * ar;
+        dx = mapX + (mapW - drawW)/2;
+        dy = mapY;
+      }
+      // Visual bias: move the map slightly upward to avoid covering the main feature with the legend.
+      dy -= mapH * 0.08;
 
     // frame + clip
     ctx.fillStyle="#fff";
@@ -631,12 +633,12 @@
       }
     }
     if(showLegend){
-      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(160*S);
-      const legX = mapX + mapW - legW - Math.round(26*S);
-      const legY = mapY + mapH - legH - Math.round(26*S);
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
-    }
+        const legW = Math.min(Math.round(760*S), Math.round(mapW * 0.48));
+        const legH = Math.round(210*S);
+        const legX = mapX + Math.round(26*S);
+        const legY = mapY + Math.round(26*S);
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      }
 
     if(showFooter){
       ctx.fillStyle="#4b5563";
