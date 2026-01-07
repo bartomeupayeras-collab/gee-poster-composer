@@ -486,7 +486,35 @@
     document.querySelectorAll(".langbtn").forEach((b)=>{
       b.classList.toggle("active", b.dataset.lang === LANG);
     });
-  });
+  
+    // Lang button active state
+    document.querySelectorAll(".langbtn[data-lang]").forEach(btn => {
+      btn.classList.toggle("active", (btn.getAttribute("data-lang") || "").toLowerCase() === LANG);
+      btn.setAttribute("aria-pressed", ((btn.getAttribute("data-lang") || "").toLowerCase() === LANG) ? "true" : "false");
+    });
+}
+
+  // --- Language switcher (CA/ES/EN) ---
+  function setLang(newLang){
+    newLang = (newLang || "").toLowerCase();
+    if(!I18N[newLang]) newLang = "ca";
+    LANG = newLang;
+    try{ localStorage.setItem("insulab_lang", LANG); }catch(e){}
+    applyLang();
+    // re-render poster to update brand/footer/legend labels
+    try{ render(); }catch(e){}
+  }
+
+  // wire language buttons
+  (function(){
+    const btns = Array.from(document.querySelectorAll(".langbtn[data-lang]"));
+    btns.forEach(b => {
+      b.addEventListener("click", function(){
+        setLang(this.getAttribute("data-lang"));
+      });
+    });
+  })();
+);
   }
 
   const $ = (id) => document.getElementById(id);
@@ -698,7 +726,7 @@
           try { payload = JSON.parse(decodeURIComponent(p)); } catch(e2){}
         }
         if(!payload) throw new Error("Bad payload");
-        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || "";
+        initial.mapUrl = (payload.dataUrl || payload.thumbUrl || payload.mapUrl || payload.map || payload.url || "")ayload.map || "";
         initial.title = payload.title || "Comparador insular";
 
         let sub = payload.subtitle || "";
@@ -814,7 +842,7 @@
 
     const headerH = Math.round(200*S);
     const subtitleMaxLines = 3;
-    const mapTop = Math.round(380*S);
+    const mapTop = Math.round(280 * S);
 
     let img;
     try {
