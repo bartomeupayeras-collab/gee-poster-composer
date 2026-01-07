@@ -16,7 +16,7 @@
     .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .brandRow{display:flex;align-items:center;gap:14px;min-width:280px}
     .logos{display:flex;align-items:center;gap:12px}
-    .logos img{height: 48px;width:auto;display:block;}
+    .logos img{height: 64px;width:auto;display:block;}
     .hgroup h1{margin:0;font-size:16px;letter-spacing:.2px}
     .hgroup .sub{margin-top:2px;font-size:12px;color:var(--muted)}
     .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -605,7 +605,7 @@
         dy = mapY;
       }
       // Visual bias: move the map slightly upward to avoid covering the main feature with the legend.
-      dy -= mapH * 0.08;
+      dy -= mapH * 0.14;
 
     // frame + clip
     ctx.fillStyle="#fff";
@@ -633,8 +633,8 @@
       }
     }
     if(showLegend){
-        const legW = Math.min(Math.round(760*S), Math.round(mapW * 0.48));
-        const legH = Math.round(210*S);
+        const legW = Math.min(Math.round(980*S), Math.round(mapW * 0.56));
+        const legH = Math.round(280*S);
         const legX = mapX + Math.round(26*S);
         const legY = mapY + Math.round(26*S);
         drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
