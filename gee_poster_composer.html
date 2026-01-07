@@ -213,12 +213,12 @@
   <div class="grid">
     <section class="card">
       <div class="pad">
-        <label>Mapa (PNG) *</label>
-        <input id="mapUrl" placeholder="getThumbURL del mapa base (PNG)" />
+        <label data-i18n="lbl_map">Mapa (PNG) *</label>
+        <input id="mapUrl" data-i18n-placeholder="ph_map" placeholder="getThumbURL del mapa base (PNG)" />
 
         <div class="row">
           <div style="flex:1">
-            <label>Amplada pòster</label>
+            <label data-i18n="lbl_width">Amplada pòster</label>
             <select id="posterW">
               <option value="2400">2400 px</option>
               <option value="3200" selected>3200 px</option>
@@ -226,20 +226,20 @@
             </select>
           </div>
           <div style="flex:1">
-            <label>Marge intern</label>
+            <label data-i18n="lbl_pad">Marge intern</label>
             <select id="padPx">
-              <option value="44">Compacte</option>
-              <option value="60" selected>Normal</option>
-              <option value="78">Airejat</option>
+              <option value="44" data-i18n="opt_compact">Compacte</option>
+              <option value="60" selected data-i18n="opt_normal">Normal</option>
+              <option value="78" data-i18n="opt_airy">Airejat</option>
             </select>
           </div>
         </div>
 
         <div class="tog">
-          <label class="pill"><input type="checkbox" id="showLegend" checked> Llegenda</label>
-          <label class="pill"><input type="checkbox" id="showNorth" checked> Nord</label>
-          <label class="pill"><input type="checkbox" id="showScale" checked> Escala</label>
-          <label class="pill"><input type="checkbox" id="showFooter" checked> Peu</label>
+          <label class="pill"><input type="checkbox" id="showLegend" checked> <span data-i18n="tog_legend">Llegenda</span></label>
+          <label class="pill"><input type="checkbox" id="showNorth" checked> <span data-i18n="tog_north">Nord</span></label>
+          <label class="pill"><input type="checkbox" id="showScale" checked> <span data-i18n="tog_scale">Escala</span></label>
+          <label class="pill"><input type="checkbox" id="showFooter" checked> <span data-i18n="tog_footer">Peu</span></label>
         </div>
 
         <div class="ok">
@@ -250,53 +250,53 @@
 
       <details id="adv">
         <summary>
-          <span>Detalls (avançat)</span>
-          <span class="mono">títol · llegenda</span>
+          <span data-i18n="adv_title">Detalls (avançat)</span>
+          <span class="mono" data-i18n="adv_meta">títol · llegenda</span>
         </summary>
         <div class="pad">
-          <label>Títol</label>
-          <input id="title" placeholder="Ex: Comparador insular" />
+          <label data-i18n="lbl_title">Títol</label>
+          <input id="title" data-i18n-placeholder="ph_title" placeholder="Ex: Comparador insular" />
 
-          <label>Subtítol (1–3 línies)</label>
-          <textarea id="subtitle" placeholder="Ex: Variable · Mode · Any"></textarea>
+          <label data-i18n="lbl_subtitle">Subtítol (1–3 línies)</label>
+          <textarea id="subtitle" data-i18n-placeholder="ph_subtitle" placeholder="Ex: Variable · Mode · Any"></textarea>
 
           <div class="row">
             <div style="flex:1">
-              <label>Min</label>
-              <input id="vmin" placeholder="Ex: 0.12" />
+              <label data-i18n="lbl_min">Min</label>
+              <input id="vmin" data-i18n-placeholder="ph_min" placeholder="Ex: 0.12" />
             </div>
             <div style="flex:1">
-              <label>Max</label>
-              <input id="vmax" placeholder="Ex: 0.78" />
+              <label data-i18n="lbl_max">Max</label>
+              <input id="vmax" data-i18n-placeholder="ph_max" placeholder="Ex: 0.78" />
             </div>
             <div style="flex:1">
-              <label>Unitat</label>
-              <input id="unit" placeholder="Ex: NDVI / °C / mm" />
+              <label data-i18n="lbl_unit">Unitat</label>
+              <input id="unit" data-i18n-placeholder="ph_unit" placeholder="Ex: NDVI / °C / mm" />
             </div>
           </div>
 
-          <label>Paleta (hex separats per coma)</label>
-          <input id="palette" placeholder="440154,3b528b,21918c,5ec962,fde725" />
+          <label data-i18n="lbl_palette">Paleta (hex separats per coma)</label>
+          <input id="palette" data-i18n-placeholder="ph_palette" placeholder="440154,3b528b,21918c,5ec962,fde725" />
 
           <div class="row">
             <div style="flex:1">
               <label>Escala (km)</label>
-              <input id="scaleKm" placeholder="Ex: 50" />
+              <input id="scaleKm" data-i18n-placeholder="ph_scale_km" placeholder="Ex: 50" />
             </div>
             <div style="flex:1">
-              <label>Amplada escala (px)</label>
-              <input id="scalePx" placeholder="Ex: 180" />
+              <label data-i18n="lbl_scale_px">Amplada escala (px)</label>
+              <input id="scalePx" data-i18n-placeholder="ph_scale_px" placeholder="Ex: 180" />
             </div>
           </div>
 
           <div class="row">
             <div style="flex:1">
-              <label>Peu</label>
-              <input id="footer" placeholder="Ex: GEE · Copernicus · Consell Insular" />
+              <label data-i18n="lbl_footer">Peu</label>
+              <input id="footer" data-i18n-placeholder="ph_footer" placeholder="Ex: GEE · Copernicus · Consell Insular" />
             </div>
           </div>
 
-          <div class="hint" style="margin-top:10px">
+          <div class="hint" style="margin-top:10px" data-i18n="cors_hint">
             Si la descàrrega falla, gairebé sempre és <b>CORS</b> (canvas “tainted”).
             En aquest cas, el PNG del mapa no es pot llegir dins el canvas.
           </div>
@@ -325,11 +325,45 @@
       reset: "Recarregar",
       render: "Generar",
       download: "Descarregar PNG",
-      generating: ""+t("generating")+"",
+      generating: "Generant...",
       done: "Fet",
       legend: "Llegenda",
-      generated: t("generated"),
-      missingMap: "Falta l'URL del mapa (PNG)."
+      generatedWith: "Generat amb InsuLab",
+      missingMap: "Falta l'URL del mapa (PNG).",
+
+      // UI labels
+      lbl_map: "Mapa (PNG) *",
+      ph_map: "getThumbURL del mapa base (PNG)",
+      lbl_width: "Amplada pòster",
+      lbl_pad: "Marge intern",
+      opt_compact: "Compacte",
+      opt_normal: "Normal",
+      opt_airy: "Airejat",
+      tog_legend: "Llegenda",
+      tog_north: "Nord",
+      tog_scale: "Escala",
+      tog_footer: "Peu",
+      adv_title: "Detalls (avançat)",
+      adv_meta: "títol · llegenda",
+      lbl_title: "Títol",
+      ph_title: "Ex: Comparador insular",
+      lbl_subtitle: "Subtítol (1–3 línies)",
+      ph_subtitle: "Ex: Variable · Mode · Any",
+      lbl_min: "Min",
+      ph_min: "Ex: 0.12",
+      lbl_max: "Max",
+      ph_max: "Ex: 0.78",
+      lbl_unit: "Unitat",
+      ph_unit: "Ex: NDVI / °C / mm",
+      lbl_palette: "Paleta (hex separats per coma)",
+      ph_palette: "440154,3b528b,21918c,5ec962,fde725",
+      lbl_scale_km: "Escala (km) (si activada)",
+      ph_scale_km: "Ex: 50",
+      lbl_scale_px: "Amplada escala (px)",
+      ph_scale_px: "Ex: 180",
+      lbl_footer: "Peu",
+      ph_footer: "Ex: GEE · Copernicus · Consell Insular",
+      cors_hint: "Si la descàrrega falla, gairebé sempre és CORS (canvas “tainted”). En aquest cas, el PNG del mapa no es pot llegir dins el canvas."
     },
     es: {
       hdr: "InsuLab · Cátedra de la Insularidad",
@@ -339,19 +373,85 @@
       generating: "Generando...",
       done: "Hecho",
       legend: "Leyenda",
-      generated: "Generado con InsuLab",
-      missingMap: "Falta la URL del mapa (PNG)."
+      generatedWith: "Generado con InsuLab",
+      missingMap: "Falta la URL del mapa (PNG).",
+
+      lbl_map: "Mapa (PNG) *",
+      ph_map: "getThumbURL del mapa base (PNG)",
+      lbl_width: "Ancho del póster",
+      lbl_pad: "Margen interno",
+      opt_compact: "Compacto",
+      opt_normal: "Normal",
+      opt_airy: "Aireado",
+      tog_legend: "Leyenda",
+      tog_north: "Norte",
+      tog_scale: "Escala",
+      tog_footer: "Pie",
+      adv_title: "Detalles (avanzado)",
+      adv_meta: "título · leyenda",
+      lbl_title: "Título",
+      ph_title: "Ej: Comparador insular",
+      lbl_subtitle: "Subtítulo (1–3 líneas)",
+      ph_subtitle: "Ej: Variable · Modo · Año",
+      lbl_min: "Mín",
+      ph_min: "Ej: 0.12",
+      lbl_max: "Máx",
+      ph_max: "Ej: 0.78",
+      lbl_unit: "Unidad",
+      ph_unit: "Ej: NDVI / °C / mm",
+      lbl_palette: "Paleta (hex separados por coma)",
+      ph_palette: "440154,3b528b,21918c,5ec962,fde725",
+      lbl_scale_km: "Escala (km) (si está activada)",
+      ph_scale_km: "Ej: 50",
+      lbl_scale_px: "Ancho de la escala (px)",
+      ph_scale_px: "Ej: 180",
+      lbl_footer: "Pie",
+      ph_footer: "Ej: GEE · Copernicus · Consell Insular",
+      cors_hint: "Si la descarga falla, casi siempre es CORS (canvas “tainted”). En ese caso, el PNG del mapa no se puede leer dentro del canvas."
     },
     en: {
-      hdr: "InsuLab · Chair of Insularity",
+      hdr: "InsuLab · Insularity Chair",
       reset: "Reload",
-      render: "Render",
+      render: "Generate",
       download: "Download PNG",
-      generating: "Rendering...",
+      generating: "Generating...",
       done: "Done",
       legend: "Legend",
-      generated: "Generated with InsuLab",
-      missingMap: "Missing map URL (PNG)."
+      generatedWith: "Generated with InsuLab",
+      missingMap: "Missing map URL (PNG).",
+
+      lbl_map: "Map (PNG) *",
+      ph_map: "Map base getThumbURL (PNG)",
+      lbl_width: "Poster width",
+      lbl_pad: "Inner padding",
+      opt_compact: "Compact",
+      opt_normal: "Normal",
+      opt_airy: "Airy",
+      tog_legend: "Legend",
+      tog_north: "North",
+      tog_scale: "Scale",
+      tog_footer: "Footer",
+      adv_title: "Details (advanced)",
+      adv_meta: "title · legend",
+      lbl_title: "Title",
+      ph_title: "e.g., Insular comparator",
+      lbl_subtitle: "Subtitle (1–3 lines)",
+      ph_subtitle: "e.g., Variable · Mode · Year",
+      lbl_min: "Min",
+      ph_min: "e.g., 0.12",
+      lbl_max: "Max",
+      ph_max: "e.g., 0.78",
+      lbl_unit: "Unit",
+      ph_unit: "e.g., NDVI / °C / mm",
+      lbl_palette: "Palette (hex, comma-separated)",
+      ph_palette: "440154,3b528b,21918c,5ec962,fde725",
+      lbl_scale_km: "Scale (km) (if enabled)",
+      ph_scale_km: "e.g., 50",
+      lbl_scale_px: "Scale width (px)",
+      ph_scale_px: "e.g., 180",
+      lbl_footer: "Footer",
+      ph_footer: "e.g., GEE · Copernicus · Consell Insular",
+      cors_hint: "If download fails, it is almost always CORS (tainted canvas). In that case the PNG cannot be read inside the canvas."
     }
   };
 
@@ -364,13 +464,29 @@
     document.title = t("hdr");
     const ht = document.getElementById("hdrTitle");
     if(ht) ht.textContent = t("hdr");
+
     const r = $("btnReset"), g = $("btnRender"), d = $("btnDownload");
     if(r) r.textContent = t("reset");
     if(g) g.textContent = t("render");
     if(d) d.textContent = t("download");
+
+    // Update static labels
+    document.querySelectorAll("[data-i18n]").forEach(el=>{
+      const k = el.getAttribute("data-i18n");
+      if(!k) return;
+      el.textContent = t(k);
+    });
+    // Update placeholders
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(el=>{
+      const k = el.getAttribute("data-i18n-placeholder");
+      if(!k) return;
+      el.setAttribute("placeholder", t(k));
+    });
+
     document.querySelectorAll(".langbtn").forEach((b)=>{
       b.classList.toggle("active", b.dataset.lang === LANG);
     });
+  });
   }
 
   const $ = (id) => document.getElementById(id);
@@ -576,7 +692,12 @@
     const p = qs("p");
     if (p) {
       try {
-        const payload = JSON.parse(decodeURIComponent(p));
+        let payload = null;
+        try { payload = JSON.parse(p); }
+        catch(e1){
+          try { payload = JSON.parse(decodeURIComponent(p)); } catch(e2){}
+        }
+        if(!payload) throw new Error("Bad payload");
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || "";
         initial.title = payload.title || "Comparador insular";
 
