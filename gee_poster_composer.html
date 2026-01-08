@@ -525,6 +525,24 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     });
   }
 
+  // Ensure <img> elements (data URIs) are fully decoded before reading naturalWidth/Height
+  async function ensureImgReady(el){
+    try{
+      if(!el) return;
+      if(el.complete && (el.naturalWidth || el.width)) return;
+      if(typeof el.decode === "function"){
+        try{ await el.decode(); }catch(_e){}
+        if(el.complete && (el.naturalWidth || el.width)) return;
+      }
+      await new Promise((resolve) => {
+        const done = () => resolve();
+        el.addEventListener("load", done, {once:true});
+        el.addEventListener("error", done, {once:true});
+      });
+    }catch(_e){ /* ignore */ }
+  }
+
+
   async function render(){
     setErr("");
     $("btnRender").disabled=true;
@@ -592,10 +610,12 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
     // logos in poster (left)
-    const logoH = Math.round(165*S);
+    const logoH = Math.round(240*S);
     const gap = Math.round(26*S);
     const uibImg = $("logoUIB");
     const goibImg = $("logoGOIB");
+    await ensureImgReady(uibImg);
+    await ensureImgReady(goibImg);
     // drawImage on <img> elements works once loaded (they're data URI)
     const yLogo = Math.round(70*S);
     // compute widths proportional
@@ -613,23 +633,28 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.textAlign="left"; ctx.textBaseline="middle";
     ctx.fillText(brandText, brandX, brandY);
 
-// title + subtitle (bigger and with extra breathing room)
+// title + subtitle (dynamic positioning to avoid overlapping logos)
+    const titleY = Math.round(yLogo + logoH + 48*S);
+    const subtitleY = titleY + Math.round(110*S);
+
     ctx.font="950 "+Math.round(80*S)+"px system-ui, sans-serif";
     ctx.textBaseline="top";
-    ctx.fillText(title, pad, Math.round(230*S));
+    ctx.fillStyle="#111";
+    ctx.fillText(title, pad, titleY);
 
     ctx.font="650 "+Math.round(38*S)+"px system-ui, sans-serif";
     ctx.fillStyle="#374151";
     const lines = subtitle ? subtitle.split("\n").slice(0,3) : [];
     for(let i=0;i<lines.length;i++) {
-      ctx.fillText(lines[i], pad, Math.round(340*S) + i*Math.round(28*S));
+      ctx.fillText(lines[i], pad, subtitleY + i*Math.round(28*S));
     }
 
-    // map frame region
-    const subStartY = Math.round(340*S);
+    // map frame region (starts after subtitle block)
+    const subStartY = subtitleY;
     const subLineH = Math.round(28*S);
     const subLines = (subtitle ? subtitle.split("\n") : []).slice(0, subtitleMaxLines);
     const mapTop = subStartY + (subLines.length ? (subLines.length*subLineH) : 0) + Math.round(70*S);
+
     const mapX = pad;
     const mapY = mapTop;
     const mapW = W - pad*2;
@@ -780,4 +805,3 @@ function drawImageContain(ctx, img, x, y, w, h){
 </script>
 </body>
 </html>
-
