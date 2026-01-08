@@ -423,7 +423,82 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
   let initialBBox = null;
   let initialDims = null;
 
-  function loadFromQuery(){
+  
+  // ---------- payload via postMessage (avoid URL-length truncation) ----------
+  function syncFormFromInitial_(){
+    setIf("mapUrl", initial.mapUrl);
+    setIf("title", initial.title);
+    setIf("subtitle", initial.subtitle);
+    setIf("vmin", initial.vmin);
+    setIf("vmax", initial.vmax);
+    setIf("unit", initial.unit);
+    setIf("palette", initial.palette);
+    setIf("scaleKm", initial.scaleKm);
+    setIf("scalePx", initial.scalePx || "180");
+    setIf("footer", initial.footer);
+    $("fn").textContent = initial.filename || "";
+  }
+
+  function applyPayloadObject_(payload){
+    if(!payload) return false;
+
+    initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+    if(payload.bbox) initialBBox = payload.bbox;
+    if(payload.dims) initialDims = payload.dims;
+
+    initial.title = payload.title || payload.meta?.island || "Comparador insular";
+
+    let sub = payload.subtitle || "";
+    if(!sub && payload.meta){
+      const m = payload.meta;
+      const parts=[];
+      if(m.mode) parts.push(m.mode);
+      if(m.map) parts.push(m.map);
+      if(m.island) parts.push(m.island);
+      if(m.date) parts.push(m.date);
+      if(m.year) parts.push(m.year);
+      if(m.yearA && m.yearB) parts.push(m.yearB + " − " + m.yearA);
+      sub = parts.join(" · ");
+    }
+    initial.subtitle = sub;
+
+    // vis / legend metadata
+    if(payload.meta){
+      if(payload.meta.min!==null && payload.meta.min!==undefined) initial.vmin = String(payload.meta.min);
+      if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
+      initial.unit = payload.meta.unit || "";
+      if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
+    }else if(payload.vis){
+      const vis = payload.vis;
+      if(vis.min!==null && vis.min!==undefined) initial.vmin = String(vis.min);
+      if(vis.max!==null && vis.max!==undefined) initial.vmax = String(vis.max);
+      if(vis.unit!==null && vis.unit!==undefined) initial.unit = String(vis.unit);
+      if(Array.isArray(vis.palette)) initial.palette = vis.palette.join(",");
+    }else{
+      if(payload.min!==null && payload.min!==undefined) initial.vmin = String(payload.min);
+      if(payload.max!==null && payload.max!==undefined) initial.vmax = String(payload.max);
+      if(payload.unit!==null && payload.unit!==undefined) initial.unit = String(payload.unit);
+      if(Array.isArray(payload.palette)) initial.palette = payload.palette.join(",");
+      else if(payload.palette) initial.palette = String(payload.palette);
+    }
+
+    initial.scaleKm = payload.scaleKm!=null ? String(payload.scaleKm) : (payload.scalekm!=null ? String(payload.scalekm) : initial.scaleKm);
+    initial.scalePx = payload.scalePx!=null ? String(payload.scalePx) : (payload.scalepx!=null ? String(payload.scalepx) : initial.scalePx);
+    initial.footer = payload.footer!=null ? String(payload.footer) : initial.footer;
+
+    const f = [
+      payload.meta?.island || "",
+      payload.subtitle || payload.meta?.map || "",
+      payload.meta?.date || "",
+      payload.meta?.mode || ""
+    ].filter(Boolean).join("_");
+    initial.filename = slug(f || payload.title || "poster") + ".png";
+
+    syncFormFromInitial_();
+    return true;
+  }
+
+function loadFromQuery(){
     // preferred: ?p=
     const p = qs("p");
     if(p){
@@ -624,19 +699,16 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
     // logos in poster (left)
-    // Slightly larger logos for better visibility in the composed poster
-    const logoH = Math.round(165*S);
-    const gap = Math.round(30*S);
+    // Larger + fixed boxes to avoid any accidental cropping.
+    const logoH = Math.round(185*S);
+    const gap = Math.round(34*S);
     const uibImg = $("logoUIB");
     const goibImg = $("logoGOIB");
     await Promise.all([ensureImgReady(uibImg), ensureImgReady(goibImg)]);
-    // drawImage on <img> elements works once loaded (they're data URI)
-    const yLogo = Math.round(58*S);
-    // compute widths proportional
-    const uibW = Math.round((uibImg.naturalWidth / uibImg.naturalHeight) * logoH);
-    const goibW = Math.round((goibImg.naturalWidth / goibImg.naturalHeight) * logoH);
-    drawImageContain(ctx, uibImg, pad, yLogo, uibW, logoH);
-    drawImageContain(ctx, goibImg, pad + uibW + gap, yLogo, goibW, logoH);
+    const yLogo = Math.round(52*S);
+    const logoBoxW = Math.round(420*S);
+    drawImageContain(ctx, uibImg, pad, yLogo, logoBoxW, logoH);
+    drawImageContain(ctx, goibImg, pad + logoBoxW + gap, yLogo, logoBoxW, logoH);
 
     // fixed brand line (cannot be edited / removed)
     const brandText = "InsuLab · Càtedra de la Insularitat";
@@ -787,6 +859,23 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
   // init
   applyLang();
   loadFromQuery();
+
+  // listen for payload sent from the GEE visor
+  window.addEventListener('message', (ev) => {
+    try{
+      const d = ev.data;
+      if(!d) return;
+      const payload = (d.type === 'INSULAB_PAYLOAD') ? d.payload : (d.payload || d.p || null);
+      if(!payload) return;
+      if(applyPayloadObject_(payload)){
+        setErr('');
+        setStatus('');
+        // auto-render when a payload arrives
+        setTimeout(render, 80);
+      }
+    }catch(e){ /* ignore */ }
+  });
+
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
   // Haversine distance (km) for real scale bar
