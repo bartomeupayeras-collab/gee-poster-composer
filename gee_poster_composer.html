@@ -183,6 +183,7 @@
 </main>
 
 <script>
+
 (() => {
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
@@ -343,7 +344,7 @@
     ctx.fill();
     ctx.globalAlpha=1;
     ctx.strokeStyle="rgba(0,0,0,0.14)";
-    ctx.lineWidth=Math.max(2,Math.round(4*S));
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
     drawRoundedRect(ctx,x,y,w,h,r);
     ctx.stroke();
 
@@ -371,7 +372,7 @@
 
     // Min/Max
     ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(34*S)+"px system-ui, sans-serif";
+    ctx.font="800 "+Math.round(28*S)+"px system-ui, sans-serif";
     ctx.textBaseline="top";
     ctx.textAlign="left";
     ctx.fillText(String(vmin), barX, barY+barH+Math.round(14*S));
@@ -385,26 +386,26 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
     ctx.strokeStyle="#111";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    ctx.lineWidth=Math.max(1,Math.round(3*S));
     ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+widthPx,y); ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(x,y-Math.round(8*S)); ctx.lineTo(x,y+Math.round(8*S));
-    ctx.moveTo(x+widthPx,y-Math.round(8*S)); ctx.lineTo(x+widthPx,y+Math.round(8*S));
+    ctx.moveTo(x,y-Math.round(12*S)); ctx.lineTo(x,y+Math.round(10*S));
+    ctx.moveTo(x+widthPx,y-Math.round(12*S)); ctx.lineTo(x+widthPx,y+Math.round(10*S));
     ctx.stroke();
-    ctx.font="900 "+Math.round(14*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(18*S)+"px system-ui, sans-serif";
     ctx.textAlign="center"; ctx.textBaseline="bottom";
-    ctx.fillText(label, x+widthPx/2, y-Math.round(10*S));
+    ctx.fillText(label, x+widthPx/2, y-Math.round(12*S));
     ctx.restore();
   }
 
   // ---------- payload / params ----------
-  let initialBBox = null;
-  let initialDims = null;
-
   const initial = {
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png"
   };
+  // bbox/dims from payload for real scale
+  let initialBBox = null;
+  let initialDims = null;
 
   function loadFromQuery(){
     // preferred: ?p=
@@ -414,6 +415,8 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
         let payload=null;
         try{ payload=JSON.parse(p); } catch(_e1){ payload=JSON.parse(decodeURIComponent(p)); }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        if(payload.bbox) initialBBox = payload.bbox;
+        if(payload.dims) initialDims = payload.dims;
         initial.title = payload.title || "Comparador insular";
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
@@ -439,16 +442,7 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
           payload.meta?.date || "",
           payload.meta?.mode || ""
         ].filter(Boolean).join("_");
-        initial\.filename = slug\(f \|\| payload\.title \|\| "poster"\) \+ "\.png";
-
-        // store bbox/dims for real scale bar
-        if(payload.bbox && typeof payload.bbox === "object"){
-          initialBBox = payload.bbox;
-        }
-        if(payload.dims && typeof payload.dims === "object"){
-          initialDims = payload.dims;
-        }
-
+        initial.filename = slug(f || payload.title || "poster") + ".png";
       }catch(_e){ /* ignore */ }
     }
 
@@ -559,7 +553,7 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
     // header
-    const headerH = Math.round(460*S);
+    const headerH = Math.round(560*S);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
     ctx.strokeStyle="rgba(0,0,0,0.06)";
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
@@ -595,12 +589,14 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.fillStyle="#374151";
     const lines = subtitle ? subtitle.split("\n").slice(0,3) : [];
     for(let i=0;i<lines.length;i++) {
-      ctx.fillText(lines[i], pad, Math.round(340*S) + i*Math.round(54*S));
+      ctx.fillText(lines[i], pad, Math.round(340*S) + i*Math.round(28*S));
     }
 
     // map frame region
-    const subBlockH = (lines.length>0 ? (lines.length*Math.round(54*S)) : 0);
-    const mapTop = Math.round(340*S) + subBlockH + Math.round(90*S);
+    const subStartY = Math.round(340*S);
+    const subLineH = Math.round(28*S);
+    const subLines = (subtitle ? subtitle.split("\n") : []).slice(0, subtitleMaxLines);
+    const mapTop = subStartY + (subLines.length ? (subLines.length*subLineH) : 0) + Math.round(70*S);
     const mapX = pad;
     const mapY = mapTop;
     const mapW = W - pad*2;
@@ -645,31 +641,28 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     }
     if(showScale){
         // Prefer REAL scale using payload bbox/dims when available
-        var usedReal = false;
+        let usedReal = false;
         if(initialBBox && initialDims && initialBBox.w!=null && initialBBox.e!=null && initialBBox.s!=null && initialBBox.n!=null && initialDims.w){
-          var midLat = (Number(initialBBox.s) + Number(initialBBox.n)) / 2;
-          var kmWidth = haversineKm(midLat, Number(initialBBox.w), midLat, Number(initialBBox.e));
+          const midLat = (Number(initialBBox.s) + Number(initialBBox.n))/2;
+          const kmWidth = haversineKm(midLat, Number(initialBBox.w), midLat, Number(initialBBox.e));
           if(isFinite(kmWidth) && kmWidth>0){
-            // px per km in the DRAWN map (not the source image)
-            var pxPerKm = drawW / kmWidth;
-            var targetPx = mapW * 0.22;
-            var targetKm = targetPx / pxPerKm;
-            var kmNice = niceKm(targetKm);
-            var barPxReal = kmNice * pxPerKm;
-            barPxReal = clamp(barPxReal, mapW*0.12, mapW*0.32);
-            drawScaleBar(ctx, mapX + Math.round(44*S), mapY + mapH - Math.round(58*S), barPxReal, kmNice + " km", S);
+            const kmPerPx = kmWidth / Number(initialDims.w);
+            const targetPx = Math.round(220*S);
+            const targetKm = targetPx * kmPerPx;
+            const kmNice = niceKm(targetKm);
+            const barPx = Math.max(60, Math.min(Math.round(320*S), Math.round(kmNice / kmPerPx)));
+            drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), barPx, kmNice + " km", S);
             usedReal = true;
           }
         }
         if(!usedReal && scaleKm){
-          var km = Number(scaleKm);
+          const km = Number(scaleKm);
           if(isFinite(km) && km>0){
-            drawScaleBar(ctx, mapX + Math.round(44*S), mapY + mapH - Math.round(58*S), scalePx, km + " km", S);
+            drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
           }
         }
       }
-
-      if(showLegend){if(showLegend){
+    if(showLegend){
         const legW = Math.min(Math.round(900*S), Math.round(mapW * 0.46));
         const legH = Math.round(190*S);
         const legX = mapX + mapW - legW - Math.round(26*S);
@@ -722,6 +715,23 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
   loadFromQuery();
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
+  // Haversine distance (km) for real scale bar
+  function haversineKm(lat1, lon1, lat2, lon2){
+    const R = 6371;
+    const toRad = (d)=>d*Math.PI/180;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+  function niceKm(targetKm){
+    const opts = [1,2,5,10,20,50,100,200,500,1000];
+    let best = opts[0];
+    for(const k of opts){ if(k<=targetKm) best=k; }
+    return best;
+  }
+
+
 </script>
 </body>
 </html>
