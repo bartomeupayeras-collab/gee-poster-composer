@@ -297,14 +297,23 @@
   const setStatus = (html) => $("status").innerHTML = html || "";
 
   const parsePalette = (s) => {
-    if(!s) return ["#440154","#3b528b","#21918c","#5ec962","#fde725"];
-    return String(s).split(",").map(x => {
-      x=(x||"").trim().replace("#","");
-      if(!x) return null;
-      if(x.length===3) x=x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
-      return "#"+x;
-    }).filter(Boolean);
-  };
+  // Accepts "440154,3b528b,21918c" or "#440154,#3b528b,..." and returns validated #RRGGBB list.
+  // Invalid entries are dropped; if nothing valid remains, a sensible default is used.
+  const fallback = ["#440154","#3b528b","#21918c","#5ec962","#fde725"];
+  if(!s) return fallback;
+
+  const hex6 = /^[0-9a-fA-F]{6}$/;
+  const out = String(s).split(",").map(x => {
+    x = (x||"").trim().replace(/^#/, "");
+    if(!x) return null;
+    if(x.length===3) x = x[0]+x[0]+x[1]+x[1]+x[2]+x[2];
+    if(!hex6.test(x)) return null;
+    return "#"+x.toUpperCase();
+  }).filter(Boolean);
+
+  return out.length ? out : fallback;
+};
+
 
   const slug = (s) => (String(s||"").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -422,16 +431,56 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
   let initialBBox = null;
   let initialDims = null;
 
-  function loadFromQuery(){
-    // preferred: ?p=
-    const p = qs("p");
-    if(p){
-      try{
-        let payload=null;
-        try{ payload=JSON.parse(p); } catch(_e1){ payload=JSON.parse(decodeURIComponent(p)); }
-        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        if(payload.bbox) initialBBox = payload.bbox;
-        if(payload.dims) initialDims = payload.dims;
+  function safeDecode(s){
+  // Try multiple decodes, handle '+' that sometimes survives encoding.
+  let out = String(s ?? "");
+  // URLSearchParams already decodes percent-escapes, but we still guard against double-encoding.
+  out = out.replace(/\+/g, "%20");
+  for(let i=0;i<3;i++){
+    try{
+      const dec = decodeURIComponent(out);
+      if(dec === out) break;
+      out = dec;
+    }catch(_e){
+      break;
+    }
+  }
+  return out;
+}
+
+function safeJSONParse(s){
+  const raw = String(s ?? "");
+  // Support base64url payloads to avoid URL length/encoding pitfalls: ?p=b64:<...>
+  if(raw.startsWith("b64:")){
+    try{
+      const b64 = raw.slice(4).replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
+      const jsonStr = atob(b64 + pad);
+      return JSON.parse(jsonStr);
+    }catch(_e){ /* fall through */ }
+  }
+  // Normal / encoded JSON
+  try{ return JSON.parse(raw); }catch(_e1){
+    try{ return JSON.parse(safeDecode(raw)); }catch(_e2){
+      // Last resort: sometimes quotes get HTML-escaped by copy/paste
+      const unescaped = safeDecode(raw).replace(/&quot;/g,'"').replace(/&#34;/g,'"');
+      return JSON.parse(unescaped);
+    }
+  }
+}
+
+function isNum(x){ return typeof x==="number" ? isFinite(x) : isFinite(Number(x)); }
+
+function loadFromQuery(){
+  // preferred: ?p= (JSON payload)
+  const p = qs("p");
+  if(p){
+    try{
+      const payload = safeJSONParse(p) || {};
+      initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+      if(payload.bbox) initialBBox = payload.bbox;
+      if(payload.dims) initialDims = payload.dims;
+
         initial.title = payload.title || "Comparador insular";
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
@@ -700,19 +749,28 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     if(showScale){
         // Prefer REAL scale using payload bbox/dims when available
         let usedReal = false;
-        if(initialBBox && initialDims && initialBBox.w!=null && initialBBox.e!=null && initialBBox.s!=null && initialBBox.n!=null && initialDims.w){
-          const midLat = (Number(initialBBox.s) + Number(initialBBox.n))/2;
-          const kmWidth = haversineKm(midLat, Number(initialBBox.w), midLat, Number(initialBBox.e));
-          if(isFinite(kmWidth) && kmWidth>0){
-            const kmPerPx = kmWidth / Number(initialDims.w);
-            const targetPx = Math.round(220*S);
-            const targetKm = targetPx * kmPerPx;
-            const kmNice = niceKm(targetKm);
-            const barPx = Math.max(60, Math.min(Math.round(320*S), Math.round(kmNice / kmPerPx)));
-            drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), barPx, kmNice + " km", S);
-            usedReal = true;
-          }
-        }
+if(
+  initialBBox && initialDims &&
+  initialBBox.w!=null && initialBBox.e!=null && initialBBox.s!=null && initialBBox.n!=null &&
+  initialDims.w!=null && isFinite(Number(initialDims.w)) && Number(initialDims.w) > 0 &&
+  isFinite(Number(initialBBox.w)) && isFinite(Number(initialBBox.e)) &&
+  isFinite(Number(initialBBox.s)) && isFinite(Number(initialBBox.n))
+){
+  const midLat = (Number(initialBBox.s) + Number(initialBBox.n))/2;
+  const kmWidth = haversineKm(midLat, Number(initialBBox.w), midLat, Number(initialBBox.e));
+  if(isFinite(kmWidth) && kmWidth>0){
+    const kmPerPx = kmWidth / Number(initialDims.w);
+    if(isFinite(kmPerPx) && kmPerPx>0){
+      const targetPx = Math.round(220*S);
+      const targetKm = targetPx * kmPerPx;
+      const kmNice = niceKm(targetKm);
+      const barPx = Math.max(60, Math.min(Math.round(320*S), Math.round(kmNice / kmPerPx)));
+      drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), barPx, kmNice + " km", S);
+      usedReal = true;
+    }
+  }
+}
+
         if(!usedReal && scaleKm){
           const km = Number(scaleKm);
           if(isFinite(km) && km>0){
@@ -744,20 +802,66 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     setStatus(t("done"));
   }
 
-  function download(){
-    setErr("");
+  function canvasIsReadable(){
+  // If the canvas is tainted by cross-origin image data, this will throw.
+  try{
+    const c = canvas.getContext("2d", { willReadFrequently: true });
+    c.getImageData(0,0,1,1);
+    return true;
+  }catch(_e){
+    return false;
+  }
+}
+
+function download(){
+  setErr("");
+  const name = ($("fn").textContent || "poster.png").trim() || "poster.png";
+
+  if(!canvasIsReadable()){
+    // Most common cause: CORS not allowed by the map image host → canvas becomes "tainted"
+    const msg = [
+      t("dlFail"),
+      " (CORS / canvas tainted).",
+      " ",
+      "Solució: torna a generar el PNG base del mapa amb una URL que permeti CORS,",
+      " o descarrega el mapa base per separat i usa'l com a imatge local.",
+    ].join("");
+    setErr(msg);
+    // Helpful action: open the map image in a new tab so the user can at least save it.
     try{
-      const name = $("fn").textContent || "poster.png";
+      const u = $("mapUrl").value || initial.mapUrl;
+      if(u) window.open(u, "_blank", "noopener,noreferrer");
+    }catch(_e){}
+    return;
+  }
+
+  // Prefer toBlob (more memory-friendly), fallback toDataURL.
+  try{
+    if(canvas.toBlob){
+      canvas.toBlob((blob) => {
+        if(!blob){ setErr(t("dlFail")+" (blob null)"); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.download = name;
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      }, "image/png");
+    }else{
       const a=document.createElement("a");
       a.download=name;
       a.href=canvas.toDataURL("image/png");
       document.body.appendChild(a);
       a.click();
       a.remove();
-    }catch(e){
-      setErr(t("dlFail") + e);
     }
+  }catch(e){
+    setErr(t("dlFail") + " " + (e && e.message ? e.message : String(e)));
   }
+}
+
 
   // wire
   $("btnRender").addEventListener("click", render);
