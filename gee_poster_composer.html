@@ -432,7 +432,8 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         if(payload.bbox) initialBBox = payload.bbox;
         if(payload.dims) initialDims = payload.dims;
-        initial.title = payload.title || "Comparador insular";
+        // Default title: island name when available (user request)
+        initial.title = payload.title || payload.meta?.island || "Comparador insular";
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
           const m = payload.meta;
@@ -497,11 +498,17 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
-  function loadImage(url, timeoutMs){
-    timeoutMs = timeoutMs || 25000;
+  // Load an image with optional CORS and a real timeout.
+  // v21 bugfix: render() calls loadImage(mapUrl, true/false) to try with/without CORS.
+  // Previously, the 2nd argument was interpreted as timeoutMs, so passing `true`
+  // resulted in a ~1ms timeout and the map never loaded.
+  function loadImage(url, useCORS, timeoutMs){
+    if(typeof useCORS === 'number'){ timeoutMs = useCORS; useCORS = true; }
+    if(typeof useCORS !== 'boolean') useCORS = true;
+    timeoutMs = (typeof timeoutMs === 'number' && isFinite(timeoutMs) && timeoutMs>0) ? timeoutMs : 25000;
     return new Promise(function(resolve, reject){
       var img = new Image();
-      img.crossOrigin = "anonymous";
+      if(useCORS) img.crossOrigin = "anonymous";
       var done = false;
       var t = setTimeout(function(){
         if(done) return;
@@ -523,6 +530,21 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
         reject(new Error("img_load_fail"));
       };
       img.src = url;
+    });
+  }
+
+  function ensureImgReady(img){
+    if(!img) return Promise.resolve();
+    if(img.complete && img.naturalWidth>0 && img.naturalHeight>0) return Promise.resolve();
+    if(typeof img.decode === 'function'){
+      return img.decode().catch(()=>new Promise((res)=>{
+        img.onload = () => res();
+        img.onerror = () => res();
+      }));
+    }
+    return new Promise((res)=>{
+      img.onload = () => res();
+      img.onerror = () => res();
     });
   }
 
@@ -593,12 +615,14 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
     // logos in poster (left)
-    const logoH = Math.round(95*S);
-    const gap = Math.round(26*S);
+    // Slightly larger logos for better visibility in the composed poster
+    const logoH = Math.round(125*S);
+    const gap = Math.round(30*S);
     const uibImg = $("logoUIB");
     const goibImg = $("logoGOIB");
+    await Promise.all([ensureImgReady(uibImg), ensureImgReady(goibImg)]);
     // drawImage on <img> elements works once loaded (they're data URI)
-    const yLogo = Math.round(70*S);
+    const yLogo = Math.round(58*S);
     // compute widths proportional
     const uibW = Math.round((uibImg.naturalWidth / uibImg.naturalHeight) * logoH);
     const goibW = Math.round((goibImg.naturalWidth / goibImg.naturalHeight) * logoH);
@@ -766,7 +790,10 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
   }
 
 function drawImageContain(ctx, img, x, y, w, h){
-    const ar = img.width / img.height;
+    // Use natural sizes when available (HTMLImageElement), to avoid 0×0 before layout.
+    const iw = (img && img.naturalWidth) ? img.naturalWidth : img.width;
+    const ih = (img && img.naturalHeight) ? img.naturalHeight : img.height;
+    const ar = (ih>0) ? (iw / ih) : 1;
     const boxAr = w / h;
     let dw, dh, dx, dy;
     if(ar > boxAr){ dw = w; dh = w / ar; dx = x; dy = y + (h - dh)/2; }
