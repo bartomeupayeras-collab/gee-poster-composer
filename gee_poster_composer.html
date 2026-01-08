@@ -16,7 +16,8 @@
     .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .brandRow{display:flex;align-items:center;gap:14px;min-width:280px}
     .logos{ display:flex; gap:14px; align-items:center; }
-    .logos img{height: 92px;width:auto;display:block; object-fit:contain; max-height:92px; width:auto; }
+    /* Header logos (web header, not the poster): make them bigger and never crop */
+    .logos img{height: 120px;width:auto;display:block; object-fit:contain; max-height:120px; }
     .hgroup h1{margin:0;font-size:16px;letter-spacing:.2px}
     .hgroup .sub{margin-top:2px;font-size:12px;color:var(--muted)}
     .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -53,7 +54,7 @@
     /* v21: avoid cropped logos */
     .logos img, .brandLogos img, .brand-logos img, header img.logo {
       display:block;
-      height:92px !important;
+      height:120px !important;
       width:auto !important;
       max-width:none !important;
       object-fit:contain !important;
@@ -509,7 +510,10 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     return new Promise(function(resolve, reject){
       var img = new Image();
       // Some hosts block cross-site images unless referrer is suppressed.
-      img.referrerPolicy = "no-referrer";
+      // Earth Engine thumbnail URLs can be sensitive; keep default referrer there.
+      if(!/earthengine\.googleapis\.com|earthengine\.google\.com/i.test(String(url))){
+        img.referrerPolicy = "no-referrer";
+      }
       if(useCORS) img.crossOrigin = "anonymous";
       var done = false;
       var t = setTimeout(function(){
@@ -531,14 +535,8 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
         clearTimeout(t);
         reject(new Error("img_load_fail"));
       };
-      // cache-bust to avoid stale/blocked cached responses
-      try{
-        const u = new URL(url, location.href);
-        u.searchParams.set("_cb", String(Date.now()));
-        img.src = u.toString();
-      }catch(e){
-        img.src = url + (url.indexOf("?")>=0 ? "&" : "?") + "_cb=" + Date.now();
-      }
+      // IMPORTANT: do NOT mutate the URL (some EE thumb URLs are signed; extra params can break them).
+      img.src = url;
     });
   }
 
