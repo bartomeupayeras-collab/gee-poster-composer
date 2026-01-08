@@ -16,7 +16,7 @@
     .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     .brandRow{display:flex;align-items:center;gap:14px;min-width:280px}
     .logos{display:flex;align-items:center;gap:12px}
-    .logos img{height:44px;width:auto;display:block;}
+    .logos img{height:46px;width:auto;display:block;}
     .hgroup h1{margin:0;font-size:16px;letter-spacing:.2px}
     .hgroup .sub{margin-top:2px;font-size:12px;color:var(--muted)}
     .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -400,20 +400,6 @@
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png"
   };
-  // bbox/dims from payload for real map scale
-  let initialBBox = null;
-  let initialDims = null;
-
-  function haversineKm(lat1, lon1, lat2, lon2){
-    const R = 6371;
-    const toRad = (d)=>d*Math.PI/180;
-    const dLat = toRad(lat2-lat1);
-    const dLon = toRad(lon2-lon1);
-    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
-  }
-
-
 
   function loadFromQuery(){
     // preferred: ?p=
@@ -423,9 +409,7 @@
         let payload=null;
         try{ payload=JSON.parse(p); } catch(_e1){ payload=JSON.parse(decodeURIComponent(p)); }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        if(payload.bbox) initialBBox = payload.bbox;
-        if(payload.dims) initialDims = payload.dims;
-        initial.title = payload.title || payload.meta?.island || "Comparador insular";
+        initial.title = payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
           const m = payload.meta;
@@ -561,37 +545,38 @@
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
     // header
-    const headerH = Math.round(300*S);
+    const headerH = Math.round(260*S);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
     ctx.strokeStyle="rgba(0,0,0,0.06)";
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
     // logos in poster (left)
-    const logoH = Math.round(84*S);
+    const logoH = Math.round(74*S);
     const gap = Math.round(18*S);
     const uibImg = $("logoUIB");
     const goibImg = $("logoGOIB");
-    const yLogo = Math.round(60*S);
-
+    // drawImage on <img> elements works once loaded (they're data URI)
+    const yLogo = Math.round(70*S);
     // compute widths proportional
     const uibW = Math.round((uibImg.naturalWidth / uibImg.naturalHeight) * logoH);
     const goibW = Math.round((goibImg.naturalWidth / goibImg.naturalHeight) * logoH);
     ctx.drawImage(uibImg, pad, yLogo, uibW, logoH);
     ctx.drawImage(goibImg, pad + uibW + gap, yLogo, goibW, logoH);
 
-    // fixed brand line: to the right of the logos, same line
+    // fixed brand line (cannot be edited / removed)
     const brandText = "InsuLab · Càtedra de la Insularitat";
-    const brandX = pad + uibW + gap + goibW + Math.round(22*S);
-    const brandY = yLogo + Math.round(logoH * 0.55);
     ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(30*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(26*S)+"px system-ui, sans-serif";
     ctx.textAlign="left"; ctx.textBaseline="middle";
+    const brandX = pad + uibW + gap + goibW + gap;
+    const brandY = yLogo + logoH/2;
     ctx.fillText(brandText, brandX, brandY);
+
 
     // title + subtitle (bigger and with extra breathing room)
     ctx.font="950 "+Math.round(44*S)+"px system-ui, sans-serif";
     ctx.textBaseline="top";
-    ctx.fillText(title, pad, Math.round(190*S));
+    ctx.fillText(title, pad, Math.round(185*S));
 
     ctx.font="650 "+Math.round(22*S)+"px system-ui, sans-serif";
     ctx.fillStyle="#374151";
@@ -642,43 +627,10 @@
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
     }
-    if(showScale){
-      // Prefer REAL scale using payload bbox/dims when available
-      let usedReal = false;
-      try{
-        if(initialBBox && initialDims && initialBBox.w!=null && initialBBox.e!=null && initialBBox.s!=null && initialBBox.n!=null && initialDims.w){
-          const midLat = (Number(initialBBox.s) + Number(initialBBox.n))/2;
-          const kmWidth = haversineKm(midLat, Number(initialBBox.w), midLat, Number(initialBBox.e));
-
-          // drawW is the width of the map image as drawn on canvas (covers full bbox width)
-          if(isFinite(kmWidth) && kmWidth>0 && isFinite(drawW) && drawW>0){
-            // start with a target bar width, then snap to a "nice" km value and re-compute px width
-            const targetPx = Math.min(Math.round(260*S), Math.round(mapW*0.45));
-            const kmTarget = kmWidth * (targetPx / drawW);
-
-            const niceKm = (function(v){
-              if(!isFinite(v) || v<=0) return null;
-              const pow = Math.pow(10, Math.floor(Math.log10(v)));
-              const n = v / pow;
-              const step = (n<=1) ? 1 : (n<=2) ? 2 : (n<=5) ? 5 : 10;
-              return step * pow;
-            })(kmTarget);
-
-            if(niceKm){
-              const barPx = Math.max(Math.round(80*S), Math.round(drawW * (niceKm / kmWidth)));
-              drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), barPx, niceKm + " km", S);
-              usedReal = true;
-            }
-          }
-        }
-      }catch(_e){ /* ignore */ }
-
-      // Fallback: manual scale (km + px) if provided
-      if(!usedReal && scaleKm){
-        const km = Number(scaleKm);
-        if(isFinite(km) && km>0){
-          drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
-        }
+    if(showScale && scaleKm){
+      const km = Number(scaleKm);
+      if(isFinite(km) && km>0){
+        drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
       }
     }
     if(showLegend){
