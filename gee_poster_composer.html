@@ -53,7 +53,7 @@
     /* v21: avoid cropped logos */
     .logos img, .brandLogos img, .brand-logos img, header img.logo {
       display:block;
-      height:56px !important;
+      height:92px !important;
       width:auto !important;
       max-width:none !important;
       object-fit:contain !important;
@@ -508,6 +508,8 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     timeoutMs = (typeof timeoutMs === 'number' && isFinite(timeoutMs) && timeoutMs>0) ? timeoutMs : 25000;
     return new Promise(function(resolve, reject){
       var img = new Image();
+      // Some hosts block cross-site images unless referrer is suppressed.
+      img.referrerPolicy = "no-referrer";
       if(useCORS) img.crossOrigin = "anonymous";
       var done = false;
       var t = setTimeout(function(){
@@ -529,7 +531,14 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
         clearTimeout(t);
         reject(new Error("img_load_fail"));
       };
-      img.src = url;
+      // cache-bust to avoid stale/blocked cached responses
+      try{
+        const u = new URL(url, location.href);
+        u.searchParams.set("_cb", String(Date.now()));
+        img.src = u.toString();
+      }catch(e){
+        img.src = url + (url.indexOf("?")>=0 ? "&" : "?") + "_cb=" + Date.now();
+      }
     });
   }
 
@@ -552,6 +561,8 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
     setErr("");
     $("btnRender").disabled=true;
     setStatus('<span class="spin"></span>'+t("generating"));
+    let _ok = false;
+    try{
 
     const mapUrl = ($("mapUrl").value||"").trim();
     if(!mapUrl){
@@ -593,9 +604,9 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
 
     // load map (try with CORS, fallback without)
     let img=null;
-    try{ img = await loadImage(mapUrl, true); }
+    try{ img = await loadImage(mapUrl, true, 60000); }
     catch(e1){
-      try{ img = await loadImage(mapUrl, false); }
+      try{ img = await loadImage(mapUrl, false, 60000); }
       catch(e2){
         $("btnRender").disabled=false;
         setStatus("");
@@ -616,7 +627,7 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
 
     // logos in poster (left)
     // Slightly larger logos for better visibility in the composed poster
-    const logoH = Math.round(125*S);
+    const logoH = Math.round(165*S);
     const gap = Math.round(30*S);
     const uibImg = $("logoUIB");
     const goibImg = $("logoGOIB");
@@ -739,9 +750,16 @@ function drawScaleBar(ctx,x,y,widthPx,label,S){
       const tail = (LANG==="ca") ? "Generat amb InsuLab" : (LANG==="es") ? "Generado con InsuLab" : "Generated with InsuLab";
       ctx.fillText(tail, W - pad, H - Math.round(52*S));
     }
-
-    $("btnRender").disabled=false;
+    _ok = true;
     setStatus(t("done"));
+    }catch(err){
+      console.error(err);
+      setStatus("");
+      setErr((err && err.stack) ? String(err.stack) : String(err));
+    }finally{
+      $("btnRender").disabled=false;
+      if(!_ok && !$("err").textContent){ setStatus(""); }
+    }
   }
 
   function download(){
