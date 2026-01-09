@@ -154,20 +154,16 @@
           <label id="labSubtitle"></label>
           <textarea id="subtitle"></textarea>
 
-          <div class="row">
-            <div style="flex:1">
-              <label id="labMin"></label>
-              <input id="vmin" />
-            </div>
-            <div style="flex:1">
-              <label id="labMax"></label>
-              <input id="vmax" />
-            </div>
-            <div style="flex:1">
-              <label id="labUnit"></label>
-              <input id="unit" />
-            </div>
-          </div>
+          
+          <!-- hidden advanced fields (kept for payload compatibility) -->
+          <input id="vmin" type="hidden" />
+          <input id="vmax" type="hidden" />
+          <input id="unit" type="hidden" />
+          <input id="scaleKm" type="hidden" />
+          <input id="scalePx" type="hidden" />
+          <input id="footer" type="hidden" />
+
+
 
           <label id="labPalette"></label>
           <input id="palette" />
@@ -367,27 +363,33 @@
     drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
     ctx.stroke();
 
+    // Compact legend layout (less whitespace)
+    const pad = Math.round(14*S);
+
     ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(20*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(18*S)+"px system-ui, sans-serif";
     ctx.textAlign="left";
     ctx.textBaseline="top";
-    ctx.fillText(unit || t("legend"), x+Math.round(16*S), y+Math.round(14*S));
+    ctx.fillText(unit || t("legend"), x+pad, y+Math.round(10*S));
 
-    const barX=x+Math.round(16*S), barY=y+Math.round(50*S), barW=w-Math.round(32*S), barH=Math.round(18*S);
+    const barX=x+pad, barY=y+Math.round(38*S), barW=w-(pad*2), barH=Math.round(14*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
     const stops=Math.max(1,palette.length-1);
     for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
     ctx.fillStyle=grad;
-    drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(9*S));
+    drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(8*S));
     ctx.fill();
 
+    // Values (bigger for readability)
     ctx.fillStyle="#333";
-    ctx.font="900 "+Math.round(18*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(22*S)+"px system-ui, sans-serif";
     ctx.textBaseline="top";
+    const vy = barY + barH + Math.round(6*S);
     ctx.textAlign="left";
-    ctx.fillText(sanitize(vmin), barX, barY+barH+Math.round(10*S));
+    ctx.fillText(sanitize(vmin), barX, vy);
     ctx.textAlign="right";
-    ctx.fillText(sanitize(vmax), barX+barW, barY+barH+Math.round(10*S));
+    ctx.fillText(sanitize(vmax), barX+barW, vy);
+
     ctx.restore();
   }
   function drawScaleBar(ctx,x,y,widthPx,label,S){
@@ -677,7 +679,7 @@
       }
     if(showLegend){
       const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(160*S);
+      const legH = Math.round(118*S);
       const legX = mapX + mapW - legW - Math.round(26*S);
       const legY = mapY + mapH - legH - Math.round(26*S);
       drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
