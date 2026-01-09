@@ -142,7 +142,7 @@
         </div>
       </div>
 
-      <details id="adv">
+      <details id="adv" open>
         <summary>
           <span id="advTitle"></span>
           <span class="mono" id="advSub"></span>
@@ -216,7 +216,7 @@
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
       map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
-      adv:"Detalls (avançat)", advSub:"títol · llegenda · metadades",
+      adv:"Detalls", advSub:"títol · paleta",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
       palette:"Paleta (hex separats per coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Amplada escala (px)",
       footerLab:"Peu", cors:"Si la descàrrega falla, gairebé sempre és CORS (canvas “tainted”).",
@@ -272,13 +272,13 @@
     $("advSub").textContent = t("advSub");
     $("labTitle").textContent = t("title");
     $("labSubtitle").textContent = t("subtitle");
-    $("labMin").textContent = t("min");
-    $("labMax").textContent = t("max");
-    $("labUnit").textContent = t("unit");
+    if($("labMin")) $("labMin").textContent = t("min");
+    if($("labMax")) $("labMax").textContent = t("max");
+    if($("labUnit")) $("labUnit").textContent = t("unit");
     $("labPalette").textContent = t("palette");
-    $("labScaleKm").textContent = t("scaleKm");
-    $("labScalePx").textContent = t("scalePx");
-    $("labFooter").textContent = t("footerLab");
+    if($("labScaleKm")) $("labScaleKm").textContent = t("scaleKm");
+    if($("labScalePx")) $("labScalePx").textContent = t("scalePx");
+    if($("labFooter")) $("labFooter").textContent = t("footerLab");
     $("corsHint").innerHTML = t("cors") + " " + "<span class='mono'>(" + "earthengine.googleapis.com" + ")</span>";
     document.querySelectorAll(".tab").forEach(el => {
       el.classList.toggle("active", el.dataset.lang === LANG);
@@ -382,7 +382,7 @@
     ctx.fill();
 
     ctx.fillStyle="#333";
-    ctx.font="800 "+Math.round(14*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(18*S)+"px system-ui, sans-serif";
     ctx.textBaseline="top";
     ctx.textAlign="left";
     ctx.fillText(sanitize(vmin), barX, barY+barH+Math.round(10*S));
@@ -400,7 +400,7 @@
     ctx.moveTo(x,y-Math.round(8*S)); ctx.lineTo(x,y+Math.round(8*S));
     ctx.moveTo(x+widthPx,y-Math.round(8*S)); ctx.lineTo(x+widthPx,y+Math.round(8*S));
     ctx.stroke();
-    ctx.font="900 "+Math.round(14*S)+"px system-ui, sans-serif";
+    ctx.font="900 "+Math.round(20*S)+"px system-ui, sans-serif";
     ctx.textAlign="center"; ctx.textBaseline="bottom";
     ctx.fillText(label, x+widthPx/2, y-Math.round(10*S));
     ctx.restore();
@@ -544,16 +544,16 @@
 
     const title = ($("title").value||"").trim() || "Pòster";
     const subtitle = ($("subtitle").value||"").trim();
-    const vmin = ($("vmin").value||"").trim();
-    const vmax = ($("vmax").value||"").trim();
+    const vmin = (($("vmin") && $("vmin").value) || "").trim();
+    const vmax = (($("vmax") && $("vmax").value) || "").trim();
     const unit = ($("unit").value||"").trim();
     const palette = parsePalette(($("palette").value||"").trim());
-    const scaleKm = ($("scaleKm").value||"").trim();
-    let scalePx = parseFloat(($("scalePx").value||"").trim());
+    const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
+    let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
     if(!isFinite(scalePx) || scalePx<=0) scalePx=180;
     scalePx = Math.round(scalePx * S);
 
-    const footer = ($("footer").value||"").trim();
+    const footer = (($("footer") && $("footer").value) || "").trim();
 
     const showLegend = $("showLegend").checked;
     const showNorth  = $("showNorth").checked;
