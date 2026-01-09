@@ -19,6 +19,8 @@
     .logos img{height:46px;width:auto;display:block;}
     .hgroup h1{margin:0;font-size:16px;letter-spacing:.2px}
     .hgroup .sub{margin-top:2px;font-size:12px;color:var(--muted)}
+    /* Web header: only the logo (avoid duplicated text because the logo already contains it) */
+    .hgroup{display:none}
     .btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     button{border:0;border-radius:14px;padding:10px 12px;font-weight:800;cursor:pointer;box-shadow:0 1px 0 rgba(0,0,0,.04)}
     button.primary{background:#111;color:#fff}
@@ -101,6 +103,14 @@
         <input id="mapUrl" placeholder="" />
 
         <div class="row">
+          <div style="flex:1">
+            <label id="labPosterAR"></label>
+            <select id="posterAR">
+              <option value="a4_land" selected>A4 horitzontal</option>
+              <option value="a4_port">A4 vertical</option>
+              <option value="poster">Alt (pòster)</option>
+            </select>
+          </div>
           <div style="flex:1">
             <label id="labPosterW"></label>
             <select id="posterW">
@@ -204,7 +214,7 @@
   const I18N = {
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
-      map:"Mapa (PNG) *", posterW:"Amplada pòster", pad:"Marge intern",
+      map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls (avançat)", advSub:"títol · llegenda · metadades",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
@@ -217,7 +227,7 @@
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
-      map:"Mapa (PNG) *", posterW:"Ancho póster", pad:"Margen interno",
+      map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles (avanzado)", advSub:"título · leyenda · metadatos",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
@@ -230,7 +240,7 @@
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
-      map:"Map (PNG) *", posterW:"Poster width", pad:"Inner margin",
+      map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
       legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
       adv:"Details (advanced)", advSub:"title · legend · metadata",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
@@ -251,6 +261,7 @@
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
+    $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
     $("togLegend").textContent = t("legend");
@@ -398,7 +409,9 @@
   // ---------- payload / params ----------
   const initial = {
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
-    scaleKm:"", scalePx:"", footer:"", filename:"poster.png"
+    scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
+    bbox:null,
+    dims:null
   };
 
   function loadFromQuery(){
@@ -409,6 +422,13 @@
         let payload=null;
         try{ payload=JSON.parse(p); } catch(_e1){ payload=JSON.parse(decodeURIComponent(p)); }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        // Optional: map bbox & dims for a real scale bar
+        if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
+          initial.bbox = payload.bbox;
+        }
+        if(payload.dims && isFinite(payload.dims.w) && isFinite(payload.dims.h)){
+          initial.dims = payload.dims;
+        }
         initial.title = payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
@@ -484,18 +504,36 @@
     });
   }
 
+  // distance in km between two lon/lat points (WGS84, haversine)
+  function haversineKm(lon1, lat1, lon2, lat2){
+    const toRad = (d)=>d*Math.PI/180;
+    const R = 6371.0088;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  // Pick a "nice" scale length close to target (1/2/5 * 10^n)
+  function niceKm(targetKm){
+    if(!isFinite(targetKm) || targetKm<=0) return null;
+    const p = Math.pow(10, Math.floor(Math.log10(targetKm)));
+    const n = targetKm / p;
+    const m = (n<1.5)?1 : (n<3.5)?2 : (n<7.5)?5 : 10;
+    return m*p;
+  }
+
   async function render(){
     setErr("");
     $("btnRender").disabled=true;
     setStatus('<span class="spin"></span>'+t("generating"));
 
-    const mapUrl = ($("mapUrl").value||"").trim();
-    if(!mapUrl){
-      setErr(t("missingMap"));
-      $("btnRender").disabled=false;
-      setStatus("");
-      return;
-    }
+    try{
+      const mapUrl = ($("mapUrl").value||"").trim();
+      if(!mapUrl){
+        setErr(t("missingMap"));
+        return;
+      }
 
     const posterW = parseInt($("posterW").value,10) || 3200;
     let S = posterW / 2400;
@@ -522,23 +560,23 @@
     const showScale  = $("showScale").checked;
     const showFooter = $("showFooter").checked;
 
-    // poster height tuned for "vertical-ish" posters
+    // poster aspect ratio
     const outW = posterW;
-    const outH = Math.round(outW * 1.18); // a bit taller
+    const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
+    const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
+    const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-    // load map (try with CORS, fallback without)
-    let img=null;
-    try{ img = await loadImage(mapUrl, true); }
-    catch(e1){
-      try{ img = await loadImage(mapUrl, false); }
-      catch(e2){
-        $("btnRender").disabled=false;
-        setStatus("");
-        setErr(t("loadFail"));
-        return;
+      // load map (try with CORS, fallback without)
+      let img=null;
+      try{ img = await loadImage(mapUrl, true); }
+      catch(_e1){
+        try{ img = await loadImage(mapUrl, false); }
+        catch(_e2){
+          setErr(t("loadFail"));
+          return;
+        }
       }
-    }
 
     const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
@@ -550,55 +588,34 @@
     ctx.strokeStyle="rgba(0,0,0,0.06)";
     ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
-    // logos in poster (left) — brand single logo
-const logoH = Math.round(120*S);
-const brandImg = $("logoBrand");
-const yLogo = Math.round(70*S);
-const brandW = Math.round((brandImg.naturalWidth / brandImg.naturalHeight) * logoH);
-ctx.drawImage(brandImg, pad, yLogo, brandW, logoH);
+      // poster header (single brand logo + title/subtitle)
+      const logoH = Math.round(120*S);
+      const brandImg = $("logoBrand");
+      const yLogo = Math.round(70*S);
+      const brandW = Math.round((brandImg.naturalWidth / brandImg.naturalHeight) * logoH);
+      ctx.drawImage(brandImg, pad, yLogo, brandW, logoH);
 
-// poster title & subtitle (explicit draw)
-const titleText = title || "";
-const subtitleText = subtitle || "";
-const titleX = pad;
-const titleY = yLogo + logoH + Math.round(42*S);
+      const titleX = pad;
+      const titleY = yLogo + logoH + Math.round(42*S);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = "#111";
+      ctx.font = "900 " + Math.round(54*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+      ctx.fillText(title || "", titleX, titleY);
 
-ctx.textAlign = "left";
-ctx.textBaseline = "top";
-ctx.fillStyle = "#111";
-ctx.font = "900 " + Math.round(52*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-ctx.fillText(titleText, titleX, titleY);
+      let afterHeaderTextY = titleY + Math.round(64*S);
+      if(subtitle){
+        ctx.fillStyle = "#374151";
+        ctx.font = "500 " + Math.round(28*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+        const lines = subtitle.split("\n").slice(0,3);
+        for(let i=0;i<lines.length;i++){
+          ctx.fillText(lines[i], titleX, titleY + Math.round(60*S) + i*Math.round(32*S));
+        }
+        afterHeaderTextY = titleY + Math.round(60*S) + lines.length*Math.round(32*S);
+      }
 
-if (subtitleText) {
-  ctx.fillStyle = "#374151";
-  ctx.font = "500 " + Math.round(28*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-  ctx.fillText(subtitleText, titleX, titleY + Math.round(60*S));
-}
-
-    // fixed brand line (cannot be edited / removed)
-    const brandText = "InsuLab · Càtedra de la Insularitat";
-    ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(26*S)+"px system-ui, sans-serif";
-    ctx.textAlign="left"; ctx.textBaseline="middle";
-    const brandX = pad + uibW + gap + goibW + gap;
-    const brandY = yLogo + logoH/2;
-    ctx.fillText(brandText, brandX, brandY);
-
-
-    // title + subtitle (bigger and with extra breathing room)
-    ctx.font="950 "+Math.round(44*S)+"px system-ui, sans-serif";
-    ctx.textBaseline="top";
-    ctx.fillText(title, pad, Math.round(185*S));
-
-    ctx.font="650 "+Math.round(22*S)+"px system-ui, sans-serif";
-    ctx.fillStyle="#374151";
-    const lines = subtitle ? subtitle.split("\n").slice(0,3) : [];
-    for(let i=0;i<lines.length;i++) {
-      ctx.fillText(lines[i], pad, Math.round(252*S) + i*Math.round(28*S));
-    }
-
-    // map frame region
-    const mapTop = headerH + Math.round(40*S); // bigger gap vs subtitle
+      // map frame region (start after header/text)
+      const mapTop = Math.max(headerH, Math.round(afterHeaderTextY + 34*S));
     const mapX = pad;
     const mapY = mapTop;
     const mapW = W - pad*2;
@@ -639,12 +656,25 @@ if (subtitleText) {
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
     }
-    if(showScale && scaleKm){
-      const km = Number(scaleKm);
-      if(isFinite(km) && km>0){
-        drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
+      if(showScale){
+        // 1) manual override
+        let km = Number(scaleKm);
+        // 2) auto-scale from bbox if available
+        if(!(isFinite(km) && km>0) && initial.bbox){
+          const b = initial.bbox;
+          const midLat = (b.n + b.s)/2;
+          const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
+          // Use the actual drawn map width (drawW) to compute km/px
+          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
+          const targetKm = kmPerPx * scalePx;
+          km = niceKm(targetKm);
+          // keep the bar visually consistent: adjust pixels to match the chosen nice km
+          scalePx = Math.round(km / kmPerPx);
+        }
+        if(isFinite(km) && km>0){
+          drawScaleBar(ctx, mapX + Math.round(34*S), mapY + mapH - Math.round(34*S), scalePx, km + " km", S);
+        }
       }
-    }
     if(showLegend){
       const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
       const legH = Math.round(160*S);
@@ -665,8 +695,14 @@ if (subtitleText) {
       ctx.fillText(tail, W - pad, H - Math.round(52*S));
     }
 
-    $("btnRender").disabled=false;
-    setStatus(t("done"));
+      setStatus(t("done"));
+    }catch(e){
+      // Avoid leaving UI stuck on "Generating..."
+      setErr((e && e.message) ? String(e.message) : String(e));
+      setStatus("");
+    }finally{
+      $("btnRender").disabled=false;
+    }
   }
 
   function download(){
