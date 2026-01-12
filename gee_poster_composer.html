@@ -323,6 +323,92 @@
     .replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90) || "poster");
 
   // ---------- draw primitives ----------
+
+  // Try to "zoom out" by padding the requested bbox/region in the map URL (only if the URL exposes it).
+  // IMPORTANT: If the PNG itself is already cropped by the backend request, the composer cannot recover missing pixels.
+  // This function helps only when the URL includes a bbox/region we can modify (e.g., region=... or bbox=...).
+  function maybePadMapUrl(url, bbox, padFrac){
+    try{
+      if(!bbox || !isFinite(bbox.w) || !isFinite(bbox.e) || !isFinite(bbox.s) || !isFinite(bbox.n)) return url;
+      const u = new URL(url);
+      const pad = (typeof padFrac==="number" && isFinite(padFrac) && padFrac>0) ? padFrac : 0.06;
+
+      const dx = (bbox.e - bbox.w) * pad;
+      const dy = (bbox.n - bbox.s) * pad;
+      const w = bbox.w - dx, e = bbox.e + dx, s = bbox.s - dy, n = bbox.n + dy;
+
+      // 1) bbox=w,s,e,n (common in some services)
+      if(u.searchParams.has("bbox")){
+        u.searchParams.set("bbox", [w,s,e,n].join(","));
+        return u.toString();
+      }
+
+      // 2) region=... (Earth Engine can accept GeoJSON-ish / list of coords in some URLs)
+      if(u.searchParams.has("region")){
+        const ring = [[w,s],[w,n],[e,n],[e,s],[w,s]];
+        // keep same style as many EE URLs: a JSON array of coords
+        u.searchParams.set("region", JSON.stringify(ring));
+        return u.toString();
+      }
+
+      // 3) legacy: bounds=...
+      if(u.searchParams.has("bounds")){
+        u.searchParams.set("bounds", [w,s,e,n].join(","));
+        return u.toString();
+      }
+
+      return url;
+    }catch(_e){
+      return url;
+    }
+  }
+
+  // Draw a "map-like" sea background (Google Maps/Earth vibe) inside the map frame.
+  function drawSeaBackground(ctx, x, y, w, h, S){
+    // base gradient
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, "#cfe8f6");
+    g.addColorStop(1, "#eaf6ff");
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+
+    // subtle vignette
+    const vg = ctx.createRadialGradient(x + w*0.5, y + h*0.45, Math.min(w,h)*0.15, x + w*0.5, y + h*0.45, Math.max(w,h)*0.75);
+    vg.addColorStop(0, "rgba(255,255,255,0)");
+    vg.addColorStop(1, "rgba(10,40,60,0.06)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(x, y, w, h);
+
+    // faint "bathymetry" / texture (deterministic)
+    const step = Math.max(14, Math.round(22*S));
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = "rgba(0,80,120,0.6)";
+    ctx.lineWidth = Math.max(1, Math.round(1*S));
+    for(let yy = y - (y%step); yy < y+h+step; yy += step){
+      ctx.beginPath();
+      ctx.moveTo(x, yy + Math.sin(yy*0.02)*2);
+      ctx.lineTo(x+w, yy + Math.sin((yy+123)*0.02)*2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // graticule (very faint)
+    ctx.save();
+    ctx.globalAlpha = 0.06;
+    ctx.strokeStyle = "rgba(0,0,0,0.8)";
+    ctx.lineWidth = Math.max(1, Math.round(1*S));
+    const gx = Math.max(90, Math.round(140*S));
+    const gy = Math.max(90, Math.round(140*S));
+    for(let xx=x; xx<=x+w; xx+=gx){
+      ctx.beginPath(); ctx.moveTo(xx, y); ctx.lineTo(xx, y+h); ctx.stroke();
+    }
+    for(let yy=y; yy<=y+h; yy+=gy){
+      ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x+w, yy); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function drawRoundedRect(ctx,x,y,w,h,r){
     r=Math.min(r,w/2,h/2);
     ctx.beginPath();
@@ -576,8 +662,11 @@
     const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
+    // If we have a bbox from the payload and the URL exposes bbox/region params, pad it a bit to avoid tight crops.
+    // Note: if the backend already generated a cropped PNG, we cannot recover missing pixels here.
+    mapUrl = maybePadMapUrl(mapUrl, initial && initial.bbox ? initial.bbox : null, 0.08);
 
-      // load map (try with CORS, fallback without)
+    // load map (try with CORS, fallback without)
       let img=null;
       try{ img = await loadImage(mapUrl, true); }
       catch(_e1){
@@ -655,12 +744,13 @@
 
 
     // frame + clip (sea background)
-    const seaGrad = ctx.createLinearGradient(0, mapY, 0, mapY + mapH);
-    seaGrad.addColorStop(0, SEA_TOP);
-    seaGrad.addColorStop(1, SEA_BOTTOM);
-    ctx.fillStyle = seaGrad;
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    drawSeaBackground(ctx, mapX, mapY, mapW, mapH, S);
+    ctx.restore();
+
+    // frame stroke
     ctx.strokeStyle="rgba(0,0,0,0.12)";
     ctx.lineWidth=Math.max(1,Math.round(2*S));
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
@@ -757,3 +847,4 @@
 </script>
 </body>
 </html>
+
