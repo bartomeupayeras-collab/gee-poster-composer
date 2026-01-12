@@ -206,6 +206,14 @@
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
 
+  // ---------- map view tweaks ----------
+  // A small inner margin to avoid "tight" crops when the source PNG bbox is too snug.
+  const MAP_FIT = 0.92; // 0.92 = keep 8% breathing room around the map image
+  // Sea background (shows through transparent pixels in the map PNG)
+  const SEA_TOP = "#dceff8";
+  const SEA_BOTTOM = "#f3fbff";
+
+
   // ---------- i18n ----------
   const I18N = {
     ca: {
@@ -639,8 +647,18 @@
       dy = mapY;
     }
 
-    // frame + clip
-    ctx.fillStyle="#fff";
+    // add a bit of breathing room so islands/edges don't feel "cropped"
+    drawW *= MAP_FIT;
+    drawH *= MAP_FIT;
+    dx = mapX + (mapW - drawW)/2;
+    dy = mapY + (mapH - drawH)/2;
+
+
+    // frame + clip (sea background)
+    const seaGrad = ctx.createLinearGradient(0, mapY, 0, mapY + mapH);
+    seaGrad.addColorStop(0, SEA_TOP);
+    seaGrad.addColorStop(1, SEA_BOTTOM);
+    ctx.fillStyle = seaGrad;
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
     ctx.strokeStyle="rgba(0,0,0,0.12)";
