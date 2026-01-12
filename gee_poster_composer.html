@@ -165,20 +165,9 @@
 
 
 
-          <label id="labPalette"></label>
-          <input id="palette" />
-
-          <div class="row">
-            <div style="flex:1">
-              <label id="labScaleKm"></label>
-              <input id="scaleKm" />
-            </div>
-            <div style="flex:1">
-              <label id="labScalePx"></label>
-              <input id="scalePx" />
-            </div>
-          </div>
-
+          <!-- Paleta desactivada (ve definida pel visor/GEE) -->
+          <input id="palette" type="hidden" />
+          <!-- Escala desactivada (ve definida automàticament) -->
           <div class="row">
             <div style="flex:1">
               <label id="labFooter"></label>
@@ -711,39 +700,32 @@
     }
 
     // frame + clip
-    // map background (sea-like, to avoid "floating object" feel)
-    const seaGrad = ctx.createLinearGradient(mapX, mapY, mapX, mapY+mapH);
-    seaGrad.addColorStop(0, "#dfeff6");
-    seaGrad.addColorStop(1, "#bdd6e4");
-    ctx.fillStyle = seaGrad;
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
+    ctx.fillStyle = "#ffffff";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
 
-    // subtle grid (very light)
-    ctx.save();
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
-    ctx.lineWidth = 1;
-    const step = Math.max(18, Math.round(22*S));
-    for(let xx = mapX; xx <= mapX+mapW; xx += step){
-      ctx.beginPath(); ctx.moveTo(xx, mapY); ctx.lineTo(xx, mapY+mapH); ctx.stroke();
-    }
-    for(let yy = mapY; yy <= mapY+mapH; yy += step){
-      ctx.beginPath(); ctx.moveTo(mapX, yy); ctx.lineTo(mapX+mapW, yy); ctx.stroke();
-    }
-    ctx.restore();
     ctx.strokeStyle="rgba(0,0,0,0.12)";
     ctx.lineWidth=Math.max(1,Math.round(2*S));
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
+
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
+    const cx = dx + drawW/2;
+    const cy = dy + drawH/2;
+    drawW = drawW * ZOOM;
+    drawH = drawH * ZOOM;
+    dx = cx - drawW/2;
+    dy = cy - drawH/2;
 
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
     ctx.drawImage(img, dx, dy, drawW, drawH);
     ctx.restore();
-
     // overlays
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
