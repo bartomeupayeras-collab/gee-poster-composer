@@ -206,14 +206,6 @@
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
 
-  // ---------- map view tweaks ----------
-  // A small inner margin to avoid "tight" crops when the source PNG bbox is too snug.
-  const MAP_FIT = 0.92; // 0.92 = keep 8% breathing room around the map image
-  // Sea background (shows through transparent pixels in the map PNG)
-  const SEA_TOP = "#dceff8";
-  const SEA_BOTTOM = "#f3fbff";
-
-
   // ---------- i18n ----------
   const I18N = {
     ca: {
@@ -323,92 +315,6 @@
     .replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90) || "poster");
 
   // ---------- draw primitives ----------
-
-  // Try to "zoom out" by padding the requested bbox/region in the map URL (only if the URL exposes it).
-  // IMPORTANT: If the PNG itself is already cropped by the backend request, the composer cannot recover missing pixels.
-  // This function helps only when the URL includes a bbox/region we can modify (e.g., region=... or bbox=...).
-  function maybePadMapUrl(url, bbox, padFrac){
-    try{
-      if(!bbox || !isFinite(bbox.w) || !isFinite(bbox.e) || !isFinite(bbox.s) || !isFinite(bbox.n)) return url;
-      const u = new URL(url);
-      const pad = (typeof padFrac==="number" && isFinite(padFrac) && padFrac>0) ? padFrac : 0.06;
-
-      const dx = (bbox.e - bbox.w) * pad;
-      const dy = (bbox.n - bbox.s) * pad;
-      const w = bbox.w - dx, e = bbox.e + dx, s = bbox.s - dy, n = bbox.n + dy;
-
-      // 1) bbox=w,s,e,n (common in some services)
-      if(u.searchParams.has("bbox")){
-        u.searchParams.set("bbox", [w,s,e,n].join(","));
-        return u.toString();
-      }
-
-      // 2) region=... (Earth Engine can accept GeoJSON-ish / list of coords in some URLs)
-      if(u.searchParams.has("region")){
-        const ring = [[w,s],[w,n],[e,n],[e,s],[w,s]];
-        // keep same style as many EE URLs: a JSON array of coords
-        u.searchParams.set("region", JSON.stringify(ring));
-        return u.toString();
-      }
-
-      // 3) legacy: bounds=...
-      if(u.searchParams.has("bounds")){
-        u.searchParams.set("bounds", [w,s,e,n].join(","));
-        return u.toString();
-      }
-
-      return url;
-    }catch(_e){
-      return url;
-    }
-  }
-
-  // Draw a "map-like" sea background (Google Maps/Earth vibe) inside the map frame.
-  function drawSeaBackground(ctx, x, y, w, h, S){
-    // base gradient
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, "#cfe8f6");
-    g.addColorStop(1, "#eaf6ff");
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, w, h);
-
-    // subtle vignette
-    const vg = ctx.createRadialGradient(x + w*0.5, y + h*0.45, Math.min(w,h)*0.15, x + w*0.5, y + h*0.45, Math.max(w,h)*0.75);
-    vg.addColorStop(0, "rgba(255,255,255,0)");
-    vg.addColorStop(1, "rgba(10,40,60,0.06)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(x, y, w, h);
-
-    // faint "bathymetry" / texture (deterministic)
-    const step = Math.max(14, Math.round(22*S));
-    ctx.save();
-    ctx.globalAlpha = 0.08;
-    ctx.strokeStyle = "rgba(0,80,120,0.6)";
-    ctx.lineWidth = Math.max(1, Math.round(1*S));
-    for(let yy = y - (y%step); yy < y+h+step; yy += step){
-      ctx.beginPath();
-      ctx.moveTo(x, yy + Math.sin(yy*0.02)*2);
-      ctx.lineTo(x+w, yy + Math.sin((yy+123)*0.02)*2);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // graticule (very faint)
-    ctx.save();
-    ctx.globalAlpha = 0.06;
-    ctx.strokeStyle = "rgba(0,0,0,0.8)";
-    ctx.lineWidth = Math.max(1, Math.round(1*S));
-    const gx = Math.max(90, Math.round(140*S));
-    const gy = Math.max(90, Math.round(140*S));
-    for(let xx=x; xx<=x+w; xx+=gx){
-      ctx.beginPath(); ctx.moveTo(xx, y); ctx.lineTo(xx, y+h); ctx.stroke();
-    }
-    for(let yy=y; yy<=y+h; yy+=gy){
-      ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x+w, yy); ctx.stroke();
-    }
-    ctx.restore();
-  }
-
   function drawRoundedRect(ctx,x,y,w,h,r){
     r=Math.min(r,w/2,h/2);
     ctx.beginPath();
@@ -600,6 +506,69 @@
     });
   }
 
+  // Expand bbox/region in a GEE thumb URL (if editable) to avoid tight cropping.
+  // If the PNG is already cropped server-side without bbox/region params, this won't help (composer can't invent pixels).
+  function expandThumbUrl(url, padFrac){
+    try{
+      const u = new URL(url, window.location.href);
+      const p = u.searchParams;
+
+      const pad = (isFinite(padFrac) && padFrac>0) ? padFrac : 0.08;
+
+      // bbox=minLon,minLat,maxLon,maxLat
+      if(p.has('bbox')){
+        const parts = p.get('bbox').split(',').map(s=>parseFloat(s.trim()));
+        if(parts.length===4 && parts.every(n=>isFinite(n))){
+          let [minx,miny,maxx,maxy]=parts;
+          const dx=(maxx-minx)*pad, dy=(maxy-miny)*pad;
+          minx-=dx; maxx+=dx; miny-=dy; maxy+=dy;
+          p.set('bbox', [minx,miny,maxx,maxy].join(','));
+          return u.toString();
+        }
+      }
+
+      // region=<json polygon>  (common for ee.Image.getThumbURL)
+      if(p.has('region')){
+        const raw = p.get('region') || '';
+        let obj=null;
+        try{ obj = JSON.parse(raw); } catch(e){
+          try{ obj = JSON.parse(decodeURIComponent(raw)); } catch(_e2){ obj=null; }
+        }
+        if(obj){
+          const coords=[];
+          (function walk(o){
+            if(Array.isArray(o)){
+              if(o.length===2 && typeof o[0]==='number' && typeof o[1]==='number'){
+                coords.push(o);
+              } else {
+                o.forEach(walk);
+              }
+            }
+          })(obj);
+          if(coords.length){
+            let minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+            coords.forEach(c=>{
+              minx=Math.min(minx,c[0]); maxx=Math.max(maxx,c[0]);
+              miny=Math.min(miny,c[1]); maxy=Math.max(maxy,c[1]);
+            });
+            const dx=(maxx-minx)*pad, dy=(maxy-miny)*pad;
+            minx-=dx; maxx+=dx; miny-=dy; maxy+=dy;
+
+            const rect = [[[ [minx,miny],[maxx,miny],[maxx,maxy],[minx,maxy],[minx,miny] ]]];
+            p.set('region', JSON.stringify(rect));
+            return u.toString();
+          }
+        }
+      }
+
+      return url;
+    } catch(e){
+      return url;
+    }
+  }
+
+
+
   // distance in km between two lon/lat points (WGS84, haversine)
   function haversineKm(lon1, lat1, lon2, lat2){
     const toRad = (d)=>d*Math.PI/180;
@@ -625,7 +594,7 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
-      const mapUrl = ($("mapUrl").value||"").trim();
+      let mapUrl = ($("mapUrl").value||"").trim();
       if(!mapUrl){
         setErr(t("missingMap"));
         return;
@@ -662,12 +631,10 @@
     const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
-    // If we have a bbox from the payload and the URL exposes bbox/region params, pad it a bit to avoid tight crops.
-    // Note: if the backend already generated a cropped PNG, we cannot recover missing pixels here.
-    mapUrl = maybePadMapUrl(mapUrl, initial && initial.bbox ? initial.bbox : null, 0.08);
 
-    // load map (try with CORS, fallback without)
+      // load map (try with CORS, fallback without)
       let img=null;
+      mapUrl = expandThumbUrl(mapUrl, 0.10);
       try{ img = await loadImage(mapUrl, true); }
       catch(_e1){
         try{ img = await loadImage(mapUrl, false); }
@@ -720,37 +687,52 @@
     const mapW = W - pad*2;
     const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
 
+    // inner padding so the map content never touches the frame
+    const inset = Math.round(18*S);
+    const innerX = mapX + inset;
+    const innerY = mapY + inset;
+    const innerW = mapW - inset*2;
+    const innerH = mapH - inset*2;
+
     // aspect fit map
     const ar = img.width / img.height;
-    const targetAr = mapW / mapH;
+    const targetAr = innerW / innerH;
     let drawW, drawH, dx, dy;
     if(ar > targetAr){
-      drawW = mapW;
-      drawH = mapW / ar;
-      dx = mapX;
-      dy = mapY + (mapH - drawH)/2;
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
     } else {
-      drawH = mapH;
-      drawW = mapH * ar;
-      dx = mapX + (mapW - drawW)/2;
-      dy = mapY;
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
     }
 
-    // add a bit of breathing room so islands/edges don't feel "cropped"
-    drawW *= MAP_FIT;
-    drawH *= MAP_FIT;
-    dx = mapX + (mapW - drawW)/2;
-    dy = mapY + (mapH - drawH)/2;
-
-
-    // frame + clip (sea background)
+    // frame + clip
+    // map background (sea-like, to avoid "floating object" feel)
+    const seaGrad = ctx.createLinearGradient(mapX, mapY, mapX, mapY+mapH);
+    seaGrad.addColorStop(0, "#dfeff6");
+    seaGrad.addColorStop(1, "#bdd6e4");
+    ctx.fillStyle = seaGrad;
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.save();
-    ctx.clip();
-    drawSeaBackground(ctx, mapX, mapY, mapW, mapH, S);
-    ctx.restore();
+    ctx.fill();
 
-    // frame stroke
+    // subtle grid (very light)
+    ctx.save();
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.lineWidth = 1;
+    const step = Math.max(18, Math.round(22*S));
+    for(let xx = mapX; xx <= mapX+mapW; xx += step){
+      ctx.beginPath(); ctx.moveTo(xx, mapY); ctx.lineTo(xx, mapY+mapH); ctx.stroke();
+    }
+    for(let yy = mapY; yy <= mapY+mapH; yy += step){
+      ctx.beginPath(); ctx.moveTo(mapX, yy); ctx.lineTo(mapX+mapW, yy); ctx.stroke();
+    }
+    ctx.restore();
     ctx.strokeStyle="rgba(0,0,0,0.12)";
     ctx.lineWidth=Math.max(1,Math.round(2*S));
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
