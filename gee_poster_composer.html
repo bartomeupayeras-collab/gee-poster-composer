@@ -145,8 +145,7 @@
       <details id="adv" open>
         <summary>
           <span id="advTitle"></span>
-          <span class="mono" id="advSub"></span>
-        </summary>
+</summary>
         <div class="pad">
           <label id="labTitle"></label>
           <input id="title" />
@@ -161,11 +160,7 @@
           <input id="unit" type="hidden" />
           <input id="scaleKm" type="hidden" />
           <input id="scalePx" type="hidden" />
-          <input id="footer" type="hidden" />
-
-
-
-          <!-- Paleta desactivada (ve definida pel visor/GEE) -->
+<!-- Paleta desactivada (ve definida pel visor/GEE) -->
           <input id="palette" type="hidden" />
           <!-- Escala desactivada (ve definida automàticament) -->
           <div class="row">
@@ -201,7 +196,7 @@
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
       map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
-      adv:"Detalls", advSub:"títol · paleta",
+      adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
       palette:"Paleta (hex separats per coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Amplada escala (px)",
       footerLab:"Peu", cors:"Si la descàrrega falla, gairebé sempre és CORS (canvas “tainted”).",
@@ -214,7 +209,7 @@
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
       map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
-      adv:"Detalles (avanzado)", advSub:"título · leyenda · metadatos",
+      adv:"Detalles (avanzado)", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
       palette:"Paleta (hex separados por coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Ancho escala (px)",
       footerLab:"Pie", cors:"Si la descarga falla, casi siempre es CORS (canvas “tainted”).",
@@ -227,7 +222,7 @@
       reset:"Reload", render:"Generate", download:"Download PNG",
       map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
       legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
-      adv:"Details (advanced)", advSub:"title · legend · metadata",
+      adv:"Details (advanced)", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
       palette:"Palette (hex, comma-separated)", scaleKm:"Scale (km) (if enabled)", scalePx:"Scale width (px)",
       footerLab:"Footer", cors:"If download fails, it’s usually CORS (tainted canvas).",
@@ -411,7 +406,15 @@
     if(p){
       try{
         let payload=null;
-        try{ payload=JSON.parse(p); } catch(_e1){ payload=JSON.parse(decodeURIComponent(p)); }
+        try{ payload=JSON.parse(p); }
+        catch(_e1){
+          try{ payload=JSON.parse(decodeURIComponent(p)); }
+          catch(_e2){
+            // Some launchers may base64-encode the payload
+            try{ payload=JSON.parse(atob(p)); }
+            catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
+          }
+        }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
@@ -449,7 +452,7 @@
       }catch(_e){ /* ignore */ }
     }
 
-    if(!initial.mapUrl) initial.mapUrl = qs("map") || "";
+    if(!initial.mapUrl) initial.mapUrl = qs("map") || qs("mapUrl") || qs("url") || qs("dataUrl") || "";
     if(!initial.title) initial.title = qs("title") || initial.title;
     if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
     if(!initial.vmin) initial.vmin = qs("min") || "";
