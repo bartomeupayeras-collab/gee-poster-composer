@@ -138,15 +138,15 @@
 
         <div class="row" style="margin-top:10px">
           <div style="flex:1">
-            <label id="labLegendPos"></label>
-            <select id="legendPos">
+            <label id="labLegendPos">Posició llegenda</label>
+            <select id="legendSide">
               <option value="right" selected>Dreta</option>
               <option value="left">Esquerra</option>
             </select>
           </div>
           <div style="flex:1">
-            <label id="labScalePos"></label>
-            <select id="scalePos">
+            <label id="labScalePos">Posició escala</label>
+            <select id="scaleSide">
               <option value="left" selected>Esquerra</option>
               <option value="right">Dreta</option>
             </select>
@@ -212,8 +212,8 @@
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
       map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
+      legendPos:"Posició llegenda", scalePos:"Posició escala",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
-      legendPos:"Posició llegenda", scalePos:"Posició escala", left:"Esquerra", right:"Dreta",
       adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
       palette:"Paleta (hex separats per coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Amplada escala (px)",
@@ -226,8 +226,8 @@
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
       map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
+      legendPos:"Posición leyenda", scalePos:"Posición escala",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
-      legendPos:"Posición leyenda", scalePos:"Posición escala", left:"Izquierda", right:"Derecha",
       adv:"Detalles (avanzado)", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
       palette:"Paleta (hex separados por coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Ancho escala (px)",
@@ -241,7 +241,6 @@
       reset:"Reload", render:"Generate", download:"Download PNG",
       map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
       legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
-      legendPos:"Legend position", scalePos:"Scale position", left:"Left", right:"Right",
       adv:"Details (advanced)", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
       palette:"Palette (hex, comma-separated)", scaleKm:"Scale (km) (if enabled)", scalePx:"Scale width (px)",
@@ -264,27 +263,28 @@
     $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
+    if($("labLegendPos")) $("labLegendPos").textContent = t("legendPos");
+    if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     $("togLegend").textContent = t("legend");
     $("togNorth").textContent = t("north");
     $("togScale").textContent = t("scale");
-        $("togFooter").textContent = t("footer");
-    if($("labLegendPos")) $("labLegendPos").textContent = t("legendPos");
-    if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
-    // translate select options
-    const lp = $("legendPos");
-    if(lp){
-      lp.querySelectorAll("option").forEach(o=>{
-        if(o.value==="left") o.textContent = t("left");
-        if(o.value==="right") o.textContent = t("right");
-      });
-    }
-    const sp = $("scalePos");
-    if(sp){
-      sp.querySelectorAll("option").forEach(o=>{
-        if(o.value==="left") o.textContent = t("left");
-        if(o.value==="right") o.textContent = t("right");
-      });
-    }
+    $("togFooter").textContent = t("footer");
+    $("advTitle").textContent = t("adv");
+    if($("advSub")) $("advSub").textContent = t("advSub");
+    $("labTitle").textContent = t("title");
+    $("labSubtitle").textContent = t("subtitle");
+    if($("labMin")) $("labMin").textContent = t("min");
+    if($("labMax")) $("labMax").textContent = t("max");
+    if($("labUnit")) $("labUnit").textContent = t("unit");
+    if($("labPalette")) $("labPalette").textContent = t("palette");
+    if($("labScaleKm")) $("labScaleKm").textContent = t("scaleKm");
+    if($("labScalePx")) $("labScalePx").textContent = t("scalePx");
+    if($("labFooter")) $("labFooter").textContent = t("footerLab");
+    $("corsHint").innerHTML = t("cors") + " " + "<span class='mono'>(" + "earthengine.googleapis.com" + ")</span>";
+    document.querySelectorAll(".tab").forEach(el => {
+      el.classList.toggle("active", el.dataset.lang === LANG);
+    });
+  }
 
   document.querySelectorAll(".tab").forEach(el => {
     el.addEventListener("click", () => {
@@ -725,11 +725,9 @@
 
     // frame + clip
 
-    const SEA_COLOR = "#cfe8f3";
-
     // frame (no extra "sky" background; the sea already comes from the GEE PNG)
     // keep a subtle rounded frame + border only
-    ctx.fillStyle = SEA_COLOR;
+    ctx.fillStyle = "#cfe8f3";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
 
@@ -753,52 +751,53 @@
     ctx.drawImage(img, dx, dy, drawW, drawH);
     ctx.restore();
     // overlays
+    const legendSide = ($("legendSide")? $("legendSide").value : "right");
+    const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
+
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
     }
-    // overlay positioning (legend/scale)
-    const legendSide = ($("legendPos") && $("legendPos").value) ? $("legendPos").value : "right";
-    const scaleSide  = ($("scalePos") && $("scalePos").value) ? $("scalePos").value : "left";
-    const M = Math.round(26*S);
-    const GAP = Math.round(14*S);
-    const scaleBoxH = Math.round(56*S); // reserved vertical space for scale (label + ticks)
-
-    // --- scale bar ---
-    if(showScale){
-      // 1) manual override (hidden, but payload may still set)
-      let km = Number(scaleKm);
-      // 2) auto-scale from bbox if available
-      if(!(isFinite(km) && km>0) && initial.bbox){
-        const b = initial.bbox;
-        const midLat = (b.n + b.s)/2;
-        const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-        // Use the actual drawn map width (drawW) to compute km/px
-        const kmPerPx = bboxWidthKm / Math.max(1, drawW);
-        const targetKm = kmPerPx * scalePx;
-        km = niceKm(targetKm);
-        // keep the bar visually consistent: adjust pixels to match the chosen nice km
-        scalePx = Math.round(km / kmPerPx);
+      if(showScale){
+        // 1) manual override
+        let km = Number(scaleKm);
+        // 2) auto-scale from bbox if available
+        if(!(isFinite(km) && km>0) && initial.bbox){
+          const b = initial.bbox;
+          const midLat = (b.n + b.s)/2;
+          const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
+          // Use the actual drawn map width (drawW) to compute km/px
+          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
+          const targetKm = kmPerPx * scalePx;
+          km = niceKm(targetKm);
+          // keep the bar visually consistent: adjust pixels to match the chosen nice km
+          scalePx = Math.round(km / kmPerPx);
+        }
+        if(isFinite(km) && km>0){
+          const scaleMargin = Math.round(34*S);
+          const scaleY = mapY + mapH - scaleMargin;
+          const scaleX = (scaleSide==="right") ? (mapX + mapW - scaleMargin - scalePx) : (mapX + scaleMargin);
+          drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
+        }
       }
-      if(isFinite(km) && km>0){
-        const sx = (scaleSide==="right") ? (mapX + mapW - M - scalePx) : (mapX + M);
-        const sy = mapY + mapH - M;
-        drawScaleBar(ctx, sx, sy, scalePx, km + " km", S);
-      }
-    }
-
-    // --- legend ---
     if(showLegend){
       const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
       const legH = Math.round(118*S);
-      const legX = (legendSide==="right") ? (mapX + mapW - legW - M) : (mapX + M);
+      const legMargin = Math.round(26*S);
 
-      // bottom placement by default
-      let legY = mapY + mapH - M - legH;
+      // Base position by side
+      const legX = (legendSide==="left")
+        ? (mapX + legMargin)
+        : (mapX + mapW - legW - legMargin);
 
-      // if legend and scale share the same side, stack legend ABOVE the scale area
+      // If scale is on and same side, stack legend above the scale bar
+      let legY = mapY + mapH - legH - legMargin;
       if(showScale && legendSide === scaleSide){
-        legY = mapY + mapH - M - legH - scaleBoxH - GAP;
+        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+        const gap = Math.round(14*S);
+        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
       }
+      // Safety clamp (avoid going above the map)
+      legY = Math.max(mapY + legMargin, legY);
 
       drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
@@ -847,9 +846,6 @@
     setErr("");
     setStatus("");
   });
-
-  $("legendPos").addEventListener("change", () => { if(($("mapUrl").value||"").trim()) render(); });
-  $("scalePos").addEventListener("change", () => { if(($("mapUrl").value||"").trim()) render(); });
 
   // init
   applyLang();
