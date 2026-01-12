@@ -719,39 +719,6 @@
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
 
-    ctx.save();
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
-
-    // bathymetry-like texture (subtle, "map-ish")
-    ctx.strokeStyle = "rgba(255,255,255,0.10)";
-    ctx.lineWidth = Math.max(1, Math.round(1*S));
-    const nWaves = 10;
-    for(let i=0;i<nWaves;i++){
-      const y = mapY + (mapH*(i+1)/(nWaves+1));
-      ctx.beginPath();
-      const amp = Math.round(6*S) + (i%3)*Math.round(2*S);
-      const freq = 2*Math.PI / (Math.max(120, Math.round(180*S)));
-      for(let x=mapX-40; x<=mapX+mapW+40; x+=8){
-        const yy = y + Math.sin((x-mapX)*freq + i*0.7)*amp;
-        if(x===mapX-40) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
-      }
-      ctx.stroke();
-    }
-
-    // a few soft "depth rings"
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
-    ctx.lineWidth = Math.max(1, Math.round(1*S));
-    for(let i=0;i<6;i++){
-      const cx = mapX + mapW*(0.15 + 0.7*(i/5));
-      const cy = mapY + mapH*(0.25 + 0.5*((i%3)/2));
-      const r  = Math.min(mapW,mapH)*(0.08 + 0.05*(i%3));
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, r*1.3, r, 0, 0, Math.PI*2);
-      ctx.stroke();
-    }
-    ctx.restore();
-
     // subtle grid (very light)
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
