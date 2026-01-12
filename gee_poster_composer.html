@@ -761,14 +761,13 @@
     }
 
     if(showFooter){
-      ctx.fillStyle="#4b5563";
+      // Single footer (right aligned). If user provides a footer text, it replaces the default.
       ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
-      ctx.textAlign="left"; ctx.textBaseline="middle";
-      ctx.fillText(footer || "", pad, H - Math.round(52*S));
-
-      ctx.textAlign="right";
-      ctx.fillStyle="#9ca3af";
-      const tail = (LANG==="ca") ? "Generat amb InsuLab" : (LANG==="es") ? "Generado con InsuLab" : "Generated with InsuLab";
+      ctx.textAlign="right"; 
+      ctx.textBaseline="middle";
+      ctx.fillStyle="#4b5563";
+      const defaultTail = (LANG==="ca") ? "Generat amb InsuLab" : (LANG==="es") ? "Generado con InsuLab" : "Generated with InsuLab";
+      const tail = (footer && footer.length) ? footer : defaultTail;
       ctx.fillText(tail, W - pad, H - Math.round(52*S));
     }
 
