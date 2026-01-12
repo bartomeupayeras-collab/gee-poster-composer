@@ -249,13 +249,13 @@
     $("togScale").textContent = t("scale");
     $("togFooter").textContent = t("footer");
     $("advTitle").textContent = t("adv");
-    $("advSub").textContent = t("advSub");
+    if($("advSub")) $("advSub").textContent = t("advSub");
     $("labTitle").textContent = t("title");
     $("labSubtitle").textContent = t("subtitle");
     if($("labMin")) $("labMin").textContent = t("min");
     if($("labMax")) $("labMax").textContent = t("max");
     if($("labUnit")) $("labUnit").textContent = t("unit");
-    $("labPalette").textContent = t("palette");
+    if($("labPalette")) $("labPalette").textContent = t("palette");
     if($("labScaleKm")) $("labScaleKm").textContent = t("scaleKm");
     if($("labScalePx")) $("labScalePx").textContent = t("scalePx");
     if($("labFooter")) $("labFooter").textContent = t("footerLab");
