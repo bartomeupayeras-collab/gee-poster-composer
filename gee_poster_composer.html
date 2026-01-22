@@ -223,6 +223,16 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
+  const qh = (k) => {
+    const h = (location.hash || '').replace(/^#/, '');
+    if(!h) return null;
+    try{
+      if(h.startsWith(k + '=')) return h.slice(k.length + 1);
+      return new URLSearchParams(h).get(k);
+    } catch(e){
+      return null;
+    }
+  };
 
   // ---------- i18n ----------
   const I18N = {
@@ -468,7 +478,7 @@
 
   function loadFromQuery(){
     // preferred: ?p=
-    const p = qs("p");
+    const p = qs("p") || qh("p");
     if(p){
       try{
         let payload=null;
