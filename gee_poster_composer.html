@@ -101,6 +101,7 @@
 </header>
 
 <main>
+<div id="debugBar" style="max-width:1320px;margin:10px auto 0;padding:10px 12px;border:1px dashed #c9cddc;border-radius:12px;background:#fff;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#111;"></div>
   <div class="grid">
     <section class="card">
       <div class="pad">
@@ -233,6 +234,7 @@
       return null;
     }
   };
+  const sanitize = (s) => (s||'').replace(/\+/g,'%20');
 
   // ---------- i18n ----------
   const I18N = {
@@ -484,11 +486,11 @@
         let payload=null;
         try{ payload=JSON.parse(p); }
         catch(_e1){
-          try{ payload=JSON.parse(decodeURIComponent(p)); }
+          try{ payload=JSON.parse(decodeURIComponent(sanitize(p))); }
           catch(_e2){
             // Some launchers may base64-encode the payload
             try{ payload=JSON.parse(decodeURIComponent(escape(atob(p)))); }
-            catch(_e3){ payload=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(p))))); }
+            catch(_e3){ payload=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(sanitize(p)))))); }
           }
         }
         // Support multi-map payload from the visor: {maps:[{dataUrl,bbox,dims,label,meta}, ...]}
@@ -537,7 +539,36 @@
           payload.meta?.mode || ""
         ].filter(Boolean).join("_");
         initial.filename = slug(f || payload.title || "poster") + ".png";
-      }catch(_e){ /* ignore */ }
+        // Debug (optional): show payload summary when launched from visor.
+        const dbg2 = document.getElementById('debugBar');
+        if(dbg2){
+          const map0 = (initial.maps && initial.maps[0] && initial.maps[0].dataUrl) ? initial.maps[0].dataUrl : initial.mapUrl;
+          dbg2.style.display = 'block';
+          dbg2.textContent = [
+            'DEBUG payload ok',
+            'layout=' + initial.layoutMode,
+            'maps=' + (initial.maps ? initial.maps.length : 0),
+            'map0.length=' + (map0 ? map0.length : 0)
+          ].join('\n');
+        }
+
+      }catch(_e){
+        // Debug: show why payload couldn't be parsed (helps when URL is truncated/encoded).
+        const dbg = document.getElementById('debugBar');
+        if(dbg){
+          const raw = p || '';
+          const head = raw.slice(0, 200);
+          const tail = raw.length > 200 ? raw.slice(-200) : '';
+          dbg.style.display = 'block';
+          dbg.textContent = [
+            'DEBUG payload parse failed',
+            'error: ' + (_e && _e.message ? _e.message : String(_e)),
+            'p.length=' + raw.length,
+            'p.head=' + head,
+            (tail && tail !== head) ? ('p.tail=' + tail) : ''
+          ].filter(Boolean).join('\n');
+        }
+      }
     }
 
     if(!initial.mapUrl) initial.mapUrl = qs("map") || qs("mapUrl") || qs("url") || qs("dataUrl") || "";
