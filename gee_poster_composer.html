@@ -487,16 +487,20 @@
           try{ payload=JSON.parse(decodeURIComponent(p)); }
           catch(_e2){
             // Some launchers may base64-encode the payload
-            try{ payload=JSON.parse(atob(p)); }
-            catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
+            try{ payload=JSON.parse(decodeURIComponent(escape(atob(p)))); }
+            catch(_e3){ payload=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(p))))); }
           }
         }
         // Support multi-map payload from the visor: {maps:[{dataUrl,bbox,dims,label,meta}, ...]}
         if(Array.isArray(payload.maps) && payload.maps.length){
-          initial.maps = payload.maps;
-          initial.layoutMode = (payload.maps.length>=3) ? 'triple' : 'single';
+          // Normalize map URL fields (some launchers may use mapUrl/url/map instead of dataUrl)
+          initial.maps = payload.maps.map(m => {
+            const url = (m && (m.dataUrl || m.mapUrl || m.map || m.url || m.dataURL)) || "";
+            return Object.assign({}, m, { dataUrl: url });
+          });
+          initial.layoutMode = (initial.maps.length>=3) ? 'triple' : 'single';
           // keep mapUrl populated for backward compatibility / UI display
-          initial.mapUrl = (payload.maps[0].dataUrl || payload.maps[0].mapUrl || payload.maps[0].url || "");
+          initial.mapUrl = (initial.maps[0].dataUrl || "");
         } else {
           initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         }
@@ -682,6 +686,14 @@
       if(layout === "triple"){
         if(!maps || maps.length < 3){
           setErr(t("missingMaps"));
+          return;
+        }
+        // Validate URLs (helps diagnose truncated payloads / parsing issues)
+        const bad = maps.map((m,i)=>({i, url:(m && (m.dataUrl || m.mapUrl || m.url || m.map))||""}))
+                        .filter(x=>!x.url || typeof x.url!=="string" || x.url.trim().length<20);
+        if(bad.length){
+          const detail = bad.map(b=>`#${b.i+1}`).join(", ");
+          setErr(t("missingMaps")+"  "+`(sin URL en: ${detail})`);
           return;
         }
       } else {
