@@ -107,6 +107,18 @@
         <label id="labMap"></label>
         <input id="mapUrl" placeholder="" />
 
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1">
+            <label id="labLayout"></label>
+            <select id="layoutMode">
+              <option value="single" selected>1 mapa</option>
+              <option value="triple">3 mapes</option>
+            </select>
+            <div class="hint" id="layoutHint" style="margin-top:6px"></div>
+          </div>
+        </div>
+
+
         <div class="row">
           <div style="flex:1">
             <label id="labPosterAR"></label>
@@ -216,7 +228,7 @@
   const I18N = {
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
-      map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
+      map:"Mapa (PNG) *", layout:"Composició", layout1:"1 mapa", layout3:"3 mapes", layoutHint:"Si obres el compositor des del visor amb «Mapes 1+2+3», aquí es posarà automàticament a 3 mapes.", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
@@ -231,7 +243,7 @@
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
-      map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
+      map:"Mapa (PNG) *", layout:"Composición", layout1:"1 mapa", layout3:"3 mapas", layoutHint:"Si abres el compositor desde el visor con «Mapes 1+2+3», aquí se pondrá automáticamente a 3 mapas.", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
@@ -240,13 +252,14 @@
       footerLab:"Pie", cors:"Si la descarga falla, casi siempre es CORS (canvas “tainted”).",
       generating:"Generando…", done:"✅ Listo",
       missingMap:"Falta la URL del mapa (PNG).",
+      missingMaps:"Faltan los 3 mapas en el payload (?p=…)",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
       left:"Izquierda", right:"Derecha",
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
-      map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
+      map:"Map (PNG) *", layout:"Layout", layout1:"1 map", layout3:"3 maps", layoutHint:"If you open the composer from the visor with «Mapes 1+2+3», this will switch automatically to 3 maps.", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
       legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
       adv:"Details", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
@@ -269,6 +282,8 @@
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
+    if($("labLayout")) $("labLayout").textContent = t("layout");
+    if($("layoutHint")) $("layoutHint").textContent = t("layoutHint");
     $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
@@ -446,7 +461,9 @@
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null
+    dims:null,
+    maps:null,
+    layoutMode:"single"
   };
 
   function loadFromQuery(){
@@ -464,7 +481,15 @@
             catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
           }
         }
-        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        // Support multi-map payload from the visor: {maps:[{dataUrl,bbox,dims,label,meta}, ...]}
+        if(Array.isArray(payload.maps) && payload.maps.length){
+          initial.maps = payload.maps;
+          initial.layoutMode = (payload.maps.length>=3) ? 'triple' : 'single';
+          // keep mapUrl populated for backward compatibility / UI display
+          initial.mapUrl = (payload.maps[0].dataUrl || payload.maps[0].mapUrl || payload.maps[0].url || "");
+        } else {
+          initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -513,6 +538,9 @@
     initial.footer = qs("footer") || "";
 
     setIf("mapUrl", initial.mapUrl);
+    setIf("layoutMode", initial.layoutMode || "single");
+    // If payload provides maps, lock mapUrl editing (it would desync)
+    if(initial.maps && $("mapUrl")) $("mapUrl").setAttribute("disabled","disabled");
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
     setIf("vmin", initial.vmin);
@@ -635,13 +663,26 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
+      const layout = ($("layoutMode") ? $("layoutMode").value : "single");
       let mapUrl = ($("mapUrl").value||"").trim();
-      if(!mapUrl){
-        setErr(t("missingMap"));
-        return;
+
+      // Multi-map mode requires payload.maps (sent by the visor)
+      const maps = (layout === "triple") ? (initial.maps && Array.isArray(initial.maps) ? initial.maps : null) : null;
+
+      if(layout === "triple"){
+        if(!maps || maps.length < 3){
+          setErr(t("missingMaps"));
+          return;
+        }
+      } else {
+        if(!mapUrl){
+          setErr(t("missingMap"));
+          return;
+        }
       }
 
-    const posterW = parseInt($("posterW").value,10) || 3200;
+
+const posterW = parseInt($("posterW").value,10) || 3200;
     let S = posterW / 2400;
     S = Math.max(1.0, Math.min(2.0, S));
 
@@ -673,17 +714,30 @@
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      // load map (try with CORS, fallback without)
+      // load map(s) (try with CORS, fallback without)
       let img=null;
-      mapUrl = expandThumbUrl(mapUrl, 0.10);
-      try{ img = await loadImage(mapUrl, true); }
-      catch(_e1){
-        try{ img = await loadImage(mapUrl, false); }
-        catch(_e2){
-          setErr(t("loadFail"));
-          return;
+      let imgs=null;
+      if(layout === "triple"){
+        imgs = [];
+        for(let i=0;i<3;i++){
+          const m = maps[i] || {};
+          let url = String(m.dataUrl || m.mapUrl || m.url || "").trim();
+          url = expandThumbUrl(url, 0.10);
+          try{ imgs[i] = await loadImage(url, true); }
+          catch(_e1){
+            try{ imgs[i] = await loadImage(url, false); }
+            catch(_e2){ setErr(t("loadFail")); return; }
+          }
+        }
+      } else {
+        mapUrl = expandThumbUrl(mapUrl, 0.10);
+        try{ img = await loadImage(mapUrl, true); }
+        catch(_e1){
+          try{ img = await loadImage(mapUrl, false); }
+          catch(_e2){ setErr(t("loadFail")); return; }
         }
       }
+}
 
     const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
@@ -735,102 +789,151 @@
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // aspect fit map
-    const ar = img.width / img.height;
-    const targetAr = innerW / innerH;
-    let drawW, drawH, dx, dy;
-    if(ar > targetAr){
-      drawW = innerW;
-      drawH = innerW / ar;
-      dx = innerX;
-      dy = innerY + (innerH - drawH)/2;
-    } else {
-      drawH = innerH;
-      drawW = innerH * ar;
-      dx = innerX + (innerW - drawW)/2;
-      dy = innerY;
-    }
-
-    // frame + clip
-
-    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
-    // keep a subtle rounded frame + border only
-    ctx.fillStyle = "#cfe8f3";
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.fill();
-
-    ctx.strokeStyle="rgba(0,0,0,0.12)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.stroke();
-
-    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
-    const ZOOM = 1.12;
-    const cx = dx + drawW/2;
-    const cy = dy + drawH/2;
-    drawW = drawW * ZOOM;
-    drawH = drawH * ZOOM;
-    dx = cx - drawW/2;
-    dy = cy - drawH/2;
-
-    ctx.save();
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
-    ctx.drawImage(img, dx, dy, drawW, drawH);
-    ctx.restore();
-    // overlays
+    
+    // Draw 1 or 3 maps
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
-    if(showNorth){
-      drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
-    }
-      if(showScale){
-        // 1) manual override
+    function drawOneMap(imgObj, x, y, w, h, mapMeta, drawOverlays){
+      // inner padding for rounded border breathing room
+      const inset = Math.round(0*S);
+      const innerX = x + inset;
+      const innerY = y + inset;
+      const innerW = w - inset*2;
+      const innerH = h - inset*2;
+
+      // aspect fit (cover-like, keeping full box filled)
+      const ar = imgObj.width / imgObj.height;
+      const targetAr = innerW / innerH;
+      let drawW, drawH, dx, dy;
+      if(ar > targetAr){
+        drawH = innerH;
+        drawW = drawH * ar;
+      } else {
+        drawW = innerW;
+        drawH = drawW / ar;
+      }
+      // center
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY + (innerH - drawH)/2;
+
+      // optional slight zoom to avoid 1px borders
+      const ZOOM = 1.02;
+      const cx = innerX + innerW/2;
+      const cy = innerY + innerH/2;
+      drawW = drawW * ZOOM;
+      drawH = drawH * ZOOM;
+      dx = cx - drawW/2;
+      dy = cy - drawH/2;
+
+      ctx.save();
+      drawRoundedRect(ctx, x, y, w, h, Math.round(22*S));
+      ctx.clip();
+      ctx.drawImage(imgObj, dx, dy, drawW, drawH);
+      ctx.restore();
+
+      // small label (top-left) for multi-map
+      if(mapMeta && mapMeta.label){
+        ctx.save();
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = "#fff";
+        const lp = Math.round(12*S);
+        ctx.font = "800 "+Math.round(18*S)+"px system-ui, sans-serif";
+        const text = sanitize(mapMeta.label);
+        const tw = ctx.measureText(text).width;
+        const boxW = Math.round(tw + lp*2);
+        const boxH = Math.round(32*S);
+        drawRoundedRect(ctx, x+Math.round(18*S), y+Math.round(18*S), boxW, boxH, Math.round(12*S));
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#111";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, x+Math.round(18*S)+lp, y+Math.round(18*S)+boxH/2);
+        ctx.restore();
+      }
+
+      if(!drawOverlays) return;
+
+      const showLegend = $("showLegend").checked;
+      const showNorth  = $("showNorth").checked;
+      const showScale  = $("showScale").checked;
+
+      const vminL = (mapMeta && mapMeta.vmin !== undefined) ? mapMeta.vmin : vmin;
+      const vmaxL = (mapMeta && mapMeta.vmax !== undefined) ? mapMeta.vmax : vmax;
+      const unitL = (mapMeta && mapMeta.unit !== undefined) ? mapMeta.unit : unit;
+      const palL  = (mapMeta && mapMeta.palette) ? mapMeta.palette : palette;
+
+      if(showNorth && (!mapMeta || mapMeta.isFirst)){
+        drawNorthArrow(ctx, x + w - Math.round(90*S), y + Math.round(110*S), Math.round(34*S));
+      }
+
+      if(showScale && (!mapMeta || mapMeta.isFirst)){
         let km = Number(scaleKm);
-        // 2) auto-scale from bbox if available
-        if(!(isFinite(km) && km>0) && initial.bbox){
+        let scalePxLocal = parseInt(($("scalePx") && $("scalePx").value) || "180",10) || 180;
+        if(!(isFinite(km) && km>0) && (mapMeta && mapMeta.bbox)){
+          const b = mapMeta.bbox;
+          const midLat = (b.n + b.s)/2;
+          const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
+          const kmPerPx = bboxWidthKm / Math.max(1, w);
+          const targetKm = kmPerPx * scalePxLocal;
+          km = niceKm(targetKm);
+          scalePxLocal = Math.round(km / kmPerPx);
+        } else if(!(isFinite(km) && km>0) && initial.bbox){
           const b = initial.bbox;
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-          // Use the actual drawn map width (drawW) to compute km/px
-          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
-          const targetKm = kmPerPx * scalePx;
+          const kmPerPx = bboxWidthKm / Math.max(1, w);
+          const targetKm = kmPerPx * scalePxLocal;
           km = niceKm(targetKm);
-          // keep the bar visually consistent: adjust pixels to match the chosen nice km
-          scalePx = Math.round(km / kmPerPx);
+          scalePxLocal = Math.round(km / kmPerPx);
         }
         if(isFinite(km) && km>0){
           const scaleMargin = Math.round(34*S);
-          const scaleY = mapY + mapH - scaleMargin;
-          const scaleX = (scaleSide==="right") ? (mapX + mapW - scaleMargin - scalePx) : (mapX + scaleMargin);
-          drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
+          const scaleY = y + h - scaleMargin;
+          const scaleX = (scaleSide==="right") ? (x + w - scaleMargin - scalePxLocal) : (x + scaleMargin);
+          drawScaleBar(ctx, scaleX, scaleY, scalePxLocal, km + " km", S);
         }
       }
-    if(showLegend){
-      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(140*S);
-      const legMargin = Math.round(26*S);
 
-      // Base position by side
-      const legX = (legendSide==="left")
-        ? (mapX + legMargin)
-        : (mapX + mapW - legW - legMargin);
-
-      // If scale is on and same side, stack legend above the scale bar
-      let legY = mapY + mapH - legH - legMargin;
-      if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-        const gap = Math.round(14*S);
-        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+      if(showLegend){
+        const legW = Math.min(Math.round(620*S), Math.round(w * 0.60));
+        const legH = Math.round(140*S);
+        const legMargin = Math.round(26*S);
+        const legX = (legendSide==="left") ? (x + legMargin) : (x + w - legW - legMargin);
+        let legY = y + h - legH - legMargin;
+        // stack above scale if same side
+        if(showScale && legendSide === scaleSide){
+          const scaleStackH = Math.round(54*S);
+          const gap = Math.round(14*S);
+          legY = y + h - legH - legMargin - scaleStackH - gap;
+        }
+        legY = Math.max(y + legMargin, legY);
+        drawLegend(ctx, legX, legY, legW, legH, vminL, vmaxL, unitL, palL, S);
       }
-      // Safety clamp (avoid going above the map)
-      legY = Math.max(mapY + legMargin, legY);
-
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
 
-    if(showFooter){
+    if(layout === "triple"){
+      const gap = Math.round(28*S);
+      const subW = Math.floor((mapW - gap*2) / 3);
+      const subH = mapH;
+      for(let i=0;i<3;i++){
+        const x = mapX + i*(subW + gap);
+        const meta = { isFirst: (i===0),
+          label: (maps[i] && (maps[i].label || maps[i].meta?.date)) || "",
+          bbox: maps[i] && maps[i].bbox ? maps[i].bbox : null,
+          vmin: maps[i] && maps[i].meta ? maps[i].meta.min : vmin,
+          vmax: maps[i] && maps[i].meta ? maps[i].meta.max : vmax,
+          unit: maps[i] && maps[i].meta ? maps[i].meta.unit : unit,
+          palette: maps[i] && maps[i].meta ? maps[i].meta.palette : palette
+        };
+                drawOneMap(imgs[i], x, mapY, subW, subH, meta, true);
+      }
+    } else {
+      drawOneMap(img, mapX, mapY, mapW, mapH, {bbox: initial.bbox}, true);
+    }
+
+if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
       ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
       ctx.textAlign="right"; 
