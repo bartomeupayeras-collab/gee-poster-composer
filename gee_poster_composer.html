@@ -479,21 +479,74 @@
   };
 
   function loadFromQuery(){
-    // preferred: ?p=
+    // preferred: ?p= (JSON), fallback: compact params (?n=3&ti0=...&tk0=...)
     const p = qs("p") || qh("p");
+
+    // --- Compact params path (more robust with GEE launchers) ---
     if(!p){
-      const dbg = document.getElementById('debugBar');
-      if(dbg){
-        dbg.style.display = 'block';
-        dbg.textContent = [
-          'DEBUG no payload found',
-          'location.search=' + location.search,
-          'location.hash=' + location.hash
-        ].join('\n');
+      const nRaw = qs("n") || qh("n");
+      const n = nRaw ? parseInt(nRaw, 10) : 0;
+
+      if(Number.isFinite(n) && n > 0){
+        const maps = [];
+        for(let i=0;i<n;i++){
+          const ti = qs("ti"+i) || qh("ti"+i) || "";
+          const tk = qs("tk"+i) || qh("tk"+i) || "";
+          const lab = qs("l"+i)  || qh("l"+i)  || "";
+          if(ti && tk){
+            maps.push({ ti, tk, label: lab });
+          }
+        }
+
+        if(maps.length){
+          // Normalize to the same structure as the JSON payload path
+          initial.maps = maps.map(m => ({
+            ...m,
+            dataUrl: `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`
+          }));
+          initial.layoutMode = (initial.maps.length>=3) ? 'triple' : 'single';
+          initial.mapUrl = (initial.maps[0].dataUrl || "");
+
+          initial.title = qs("t") || qs("title") || "Comparador insular";
+          initial.subtitle = qs("s") || qs("subtitle") || "";
+
+          const dbg = document.getElementById('debugBar');
+          if(dbg){
+            dbg.style.display = 'block';
+            dbg.textContent = [
+              'DEBUG compact payload OK',
+              'n=' + n,
+              'maps=' + initial.maps.length,
+              'location.search.len=' + String(location.search||'').length
+            ].join('\n');
+          }
+        } else {
+          const dbg = document.getElementById('debugBar');
+          if(dbg){
+            dbg.style.display = 'block';
+            dbg.textContent = [
+              'DEBUG compact payload present but empty maps',
+              'n=' + n,
+              'location.search=' + location.search
+            ].join('\n');
+          }
+        }
+      } else {
+        const dbg = document.getElementById('debugBar');
+        if(dbg){
+          dbg.style.display = 'block';
+          dbg.textContent = [
+            'DEBUG no payload found',
+            'location.search=' + location.search,
+            'location.hash=' + location.hash
+          ].join('\n');
+        }
+        const er = document.getElementById('err');
+        if(er) er.textContent = 'No s\'ha rebut cap payload. Revisa que el visor obri aquest HTML amb paràmetres (?p=... o ?n=...).';
       }
-      const er = document.getElementById('err');
-      if(er) er.textContent = 'No s\'ha rebut cap payload (p). Revisa que el visor obri aquest HTML i que l\'URL contengui #p=...';
     }
+
+    // --- JSON payload path ---
     if(p){
       try{
         let payload=null;
