@@ -101,7 +101,7 @@
 </header>
 
 <main>
-<div id="debugBar" style="max-width:1320px;margin:10px auto 0;padding:10px 12px;border:1px dashed #c9cddc;border-radius:12px;background:#fff;display:none;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#111;"></div>
+<div id="debugBar" style="max-width:1320px;margin:10px auto 0;padding:10px 12px;border:1px dashed #c9cddc;border-radius:12px;background:#fff;display:block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#111;">DEBUG ready (encara no s\'ha carregat cap payload)</div>
   <div class="grid">
     <section class="card">
       <div class="pad">
@@ -481,6 +481,19 @@
   function loadFromQuery(){
     // preferred: ?p=
     const p = qs("p") || qh("p");
+    if(!p){
+      const dbg = document.getElementById('debugBar');
+      if(dbg){
+        dbg.style.display = 'block';
+        dbg.textContent = [
+          'DEBUG no payload found',
+          'location.search=' + location.search,
+          'location.hash=' + location.hash
+        ].join('\n');
+      }
+      const er = document.getElementById('err');
+      if(er) er.textContent = 'No s\'ha rebut cap payload (p). Revisa que el visor obri aquest HTML i que l\'URL contengui #p=...';
+    }
     if(p){
       try{
         let payload=null;
@@ -568,6 +581,8 @@
             (tail && tail !== head) ? ('p.tail=' + tail) : ''
           ].filter(Boolean).join('\n');
         }
+        const er = document.getElementById('err');
+        if(er) er.textContent = 'No s\'ha pogut llegir el payload p (URL truncada o encoding). Mira el DEBUG a dalt.';
       }
     }
 
