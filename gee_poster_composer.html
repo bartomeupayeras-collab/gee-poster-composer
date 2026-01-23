@@ -510,7 +510,11 @@
         if(Array.isArray(payload.maps) && payload.maps.length){
           // Normalize map URL fields (some launchers may use mapUrl/url/map instead of dataUrl)
           initial.maps = payload.maps.map(m => {
-            const url = (m && (m.dataUrl || m.mapUrl || m.map || m.url || m.dataURL)) || "";
+            let url = (m && (m.dataUrl || m.mapUrl || m.map || m.url || m.dataURL)) || "";
+            // Support compact payload: thumbid+token
+            if (!url && m && m.ti && m.tk) {
+              url = `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`;
+            }
             return Object.assign({}, m, { dataUrl: url });
           });
           initial.layoutMode = (initial.maps.length>=3) ? 'triple' : 'single';
@@ -790,6 +794,7 @@ const posterW = parseInt($("posterW").value,10) || 3200;
         for(let i=0;i<3;i++){
           const m = maps[i] || {};
           let url = String(m.dataUrl || m.mapUrl || m.url || "").trim();
+          if (!url && m && m.ti && m.tk) { url = `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`; }
           url = expandThumbUrl(url, 0.10);
           try{ imgs[i] = await loadImage(url, true); }
           catch(_e1){
