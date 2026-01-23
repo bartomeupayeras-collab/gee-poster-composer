@@ -526,8 +526,8 @@
         if(payload.dims && isFinite(payload.dims.w) && isFinite(payload.dims.h)){
           initial.dims = payload.dims;
         }
-        initial.title = payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
-        let sub = payload.subtitle || "";
+        initial.title = payload.title || payload.t || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
+        let sub = payload.subtitle || payload.s || "";
         if(!sub && payload.meta){
           const m = payload.meta;
           const parts=[];
