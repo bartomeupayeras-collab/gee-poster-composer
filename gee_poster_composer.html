@@ -702,7 +702,8 @@
         }
       }
 
-      if(mapsList.length>=3){
+      const MULTI3 = (mapsList.length>=3);
+      if(MULTI3){
         const im1 = await loadOne(mapsList[0]);
         const im2 = await loadOne(mapsList[1]);
         const im3 = await loadOne(mapsList[2]);
@@ -719,7 +720,10 @@
         off.width = w1 + w2 + w3 + gut*2;
         off.height = Ht;
         const oc = off.getContext("2d");
-        oc.fillStyle = "#ffffff";
+        // Avoid interpolation halos on coastlines when downscaling/concatenating.
+        oc.imageSmoothingEnabled = false;
+        // Match the poster sea background to prevent edge blending artifacts.
+        oc.fillStyle = "#cfe8f3";
         oc.fillRect(0,0,off.width,off.height);
         oc.drawImage(im1, 0, 0, w1, Ht);
         oc.drawImage(im2, w1+gut, 0, w2, Ht);
@@ -812,8 +816,9 @@
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
-    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
-    const ZOOM = 1.12;
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE.
+    // IMPORTANT: for the 3-map composite, zoom would crop the side maps.
+    const ZOOM = MULTI3 ? 1.0 : 1.12;
     const cx = dx + drawW/2;
     const cy = dy + drawH/2;
     drawW = drawW * ZOOM;
@@ -824,7 +829,10 @@
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
+    // Avoid smoothing halos on the 3-map composite.
+    if(MULTI3) ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, dx, dy, drawW, drawH);
+    if(MULTI3) ctx.imageSmoothingEnabled = true;
     ctx.restore();
     // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
