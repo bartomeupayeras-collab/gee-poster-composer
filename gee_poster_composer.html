@@ -101,24 +101,11 @@
 </header>
 
 <main>
-<div id="debugBar" style="max-width:1320px;margin:10px auto 0;padding:10px 12px;border:1px dashed #c9cddc;border-radius:12px;background:#fff;display:block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;color:#111;">DEBUG ready (encara no s\'ha carregat cap payload)</div>
   <div class="grid">
     <section class="card">
       <div class="pad">
         <label id="labMap"></label>
         <input id="mapUrl" placeholder="" />
-
-        <div class="row" style="margin-top:10px">
-          <div style="flex:1">
-            <label id="labLayout"></label>
-            <select id="layoutMode">
-              <option value="single" selected>1 mapa</option>
-              <option value="triple">3 mapes</option>
-            </select>
-            <div class="hint" id="layoutHint" style="margin-top:6px"></div>
-          </div>
-        </div>
-
 
         <div class="row">
           <div style="flex:1">
@@ -224,23 +211,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
-  const qh = (k) => {
-    const h = (location.hash || '').replace(/^#/, '');
-    if(!h) return null;
-    try{
-      if(h.startsWith(k + '=')) return h.slice(k.length + 1);
-      return new URLSearchParams(h).get(k);
-    } catch(e){
-      return null;
-    }
-  };
-  const sanitize = (s) => (s||'').replace(/\+/g,'%20');
 
   // ---------- i18n ----------
   const I18N = {
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
-      map:"Mapa (PNG) *", layout:"Composició", layout1:"1 mapa", layout3:"3 mapes", layoutHint:"Si obres el compositor des del visor amb «Mapes 1+2+3», aquí es posarà automàticament a 3 mapes.", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
+      map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
@@ -255,7 +231,7 @@
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
-      map:"Mapa (PNG) *", layout:"Composición", layout1:"1 mapa", layout3:"3 mapas", layoutHint:"Si abres el compositor desde el visor con «Mapes 1+2+3», aquí se pondrá automáticamente a 3 mapas.", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
+      map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
@@ -264,14 +240,13 @@
       footerLab:"Pie", cors:"Si la descarga falla, casi siempre es CORS (canvas “tainted”).",
       generating:"Generando…", done:"✅ Listo",
       missingMap:"Falta la URL del mapa (PNG).",
-      missingMaps:"Faltan los 3 mapas en el payload (?p=…)",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
       left:"Izquierda", right:"Derecha",
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
-      map:"Map (PNG) *", layout:"Layout", layout1:"1 map", layout3:"3 maps", layoutHint:"If you open the composer from the visor with «Mapes 1+2+3», this will switch automatically to 3 maps.", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
+      map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
       legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
       adv:"Details", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
@@ -294,8 +269,6 @@
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
-    if($("labLayout")) $("labLayout").textContent = t("layout");
-    if($("layoutHint")) $("layoutHint").textContent = t("layoutHint");
     $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
@@ -473,109 +446,38 @@
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null,
-    maps:null,
-    layoutMode:"single"
+    dims:null
   };
 
   function loadFromQuery(){
-    // preferred: ?p= (JSON), fallback: compact params (?n=3&ti0=...&tk0=...)
-    const p = qs("p") || qh("p");
-
-    // --- Compact params path (more robust with GEE launchers) ---
-    if(!p){
-      const nRaw = qs("n") || qh("n");
-      const n = nRaw ? parseInt(nRaw, 10) : 0;
-
-      if(Number.isFinite(n) && n > 0){
-        const maps = [];
-        for(let i=0;i<n;i++){
-          const ti = qs("ti"+i) || qh("ti"+i) || "";
-          const tk = qs("tk"+i) || qh("tk"+i) || "";
-          const lab = qs("l"+i)  || qh("l"+i)  || "";
-          if(ti && tk){
-            maps.push({ ti, tk, label: lab });
-          }
-        }
-
-        if(maps.length){
-          // Normalize to the same structure as the JSON payload path
-          initial.maps = maps.map(m => ({
-            ...m,
-            dataUrl: `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`
-          }));
-          initial.layoutMode = (initial.maps.length>=3) ? 'triple' : 'single';
-          initial.mapUrl = (initial.maps[0].dataUrl || "");
-
-          initial.title = qs("t") || qs("title") || "Comparador insular";
-          initial.subtitle = qs("s") || qs("subtitle") || "";
-
-          const dbg = document.getElementById('debugBar');
-          if(dbg){
-            dbg.style.display = 'block';
-            dbg.textContent = [
-              'DEBUG compact payload OK',
-              'n=' + n,
-              'maps=' + initial.maps.length,
-              'location.search.len=' + String(location.search||'').length
-            ].join('\n');
-          }
-        } else {
-          const dbg = document.getElementById('debugBar');
-          if(dbg){
-            dbg.style.display = 'block';
-            dbg.textContent = [
-              'DEBUG compact payload present but empty maps',
-              'n=' + n,
-              'location.search=' + location.search
-            ].join('\n');
-          }
-        }
-      } else {
-        const dbg = document.getElementById('debugBar');
-        if(dbg){
-          dbg.style.display = 'block';
-          dbg.textContent = [
-            'DEBUG no payload found',
-            'location.search=' + location.search,
-            'location.hash=' + location.hash
-          ].join('\n');
-        }
-        const er = document.getElementById('err');
-        if(er) er.textContent = 'No s\'ha rebut cap payload. Revisa que el visor obri aquest HTML amb paràmetres (?p=... o ?n=...).';
-      }
-    }
-
-    // --- JSON payload path ---
+    // preferred: ?p=
+    const p = qs("p");
     if(p){
       try{
         let payload=null;
         try{ payload=JSON.parse(p); }
         catch(_e1){
-          try{ payload=JSON.parse(decodeURIComponent(sanitize(p))); }
+          try{ payload=JSON.parse(decodeURIComponent(p)); }
           catch(_e2){
             // Some launchers may base64-encode the payload
-            try{ payload=JSON.parse(decodeURIComponent(escape(atob(p)))); }
-            catch(_e3){ payload=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(sanitize(p)))))); }
+            try{ payload=JSON.parse(atob(p)); }
+            catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
           }
         }
-        // Support multi-map payload from the visor: {maps:[{dataUrl,bbox,dims,label,meta}, ...]}
-        if(Array.isArray(payload.maps) && payload.maps.length){
-          // Normalize map URL fields (some launchers may use mapUrl/url/map instead of dataUrl)
-          initial.maps = payload.maps.map(m => {
-            let url = (m && (m.dataUrl || m.mapUrl || m.map || m.url || m.dataURL)) || "";
-            // Support compact payload: thumbid+token
-            if (!url && m && m.ti && m.tk) {
-              url = `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`;
-            }
-            return Object.assign({}, m, { dataUrl: url });
-          });
-          initial.layoutMode = (initial.maps.length>=3) ? 'triple' : 'single';
-          // keep mapUrl populated for backward compatibility / UI display
-          initial.mapUrl = (initial.maps[0].dataUrl || "");
-        } else {
-          initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        }
+        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        // Multi-map payload support (e.g., payload.maps = [{dataUrl},...])
+        window.__payloadMaps = null;
+        try{
+          if(payload && Array.isArray(payload.maps)){
+            const urls = payload.maps.map(function(m){
+              if(!m) return "";
+              if(typeof m === "string") return m;
+              return m.dataUrl || m.mapUrl || m.map || m.url || "";
+            }).filter(function(u){ return (u||"").trim(); });
+            if(urls.length){ window.__payloadMaps = urls; initial.mapUrl = urls[0]; }
+          }
+        }catch(_emap){ window.__payloadMaps = null; }
+
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -583,8 +485,8 @@
         if(payload.dims && isFinite(payload.dims.w) && isFinite(payload.dims.h)){
           initial.dims = payload.dims;
         }
-        initial.title = payload.title || payload.t || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
-        let sub = payload.subtitle || payload.s || "";
+        initial.title = payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
+        let sub = payload.subtitle || "";
         if(!sub && payload.meta){
           const m = payload.meta;
           const parts=[];
@@ -609,38 +511,7 @@
           payload.meta?.mode || ""
         ].filter(Boolean).join("_");
         initial.filename = slug(f || payload.title || "poster") + ".png";
-        // Debug (optional): show payload summary when launched from visor.
-        const dbg2 = document.getElementById('debugBar');
-        if(dbg2){
-          const map0 = (initial.maps && initial.maps[0] && initial.maps[0].dataUrl) ? initial.maps[0].dataUrl : initial.mapUrl;
-          dbg2.style.display = 'block';
-          dbg2.textContent = [
-            'DEBUG payload ok',
-            'layout=' + initial.layoutMode,
-            'maps=' + (initial.maps ? initial.maps.length : 0),
-            'map0.length=' + (map0 ? map0.length : 0)
-          ].join('\n');
-        }
-
-      }catch(_e){
-        // Debug: show why payload couldn't be parsed (helps when URL is truncated/encoded).
-        const dbg = document.getElementById('debugBar');
-        if(dbg){
-          const raw = p || '';
-          const head = raw.slice(0, 200);
-          const tail = raw.length > 200 ? raw.slice(-200) : '';
-          dbg.style.display = 'block';
-          dbg.textContent = [
-            'DEBUG payload parse failed',
-            'error: ' + (_e && _e.message ? _e.message : String(_e)),
-            'p.length=' + raw.length,
-            'p.head=' + head,
-            (tail && tail !== head) ? ('p.tail=' + tail) : ''
-          ].filter(Boolean).join('\n');
-        }
-        const er = document.getElementById('err');
-        if(er) er.textContent = 'No s\'ha pogut llegir el payload p (URL truncada o encoding). Mira el DEBUG a dalt.';
-      }
+      }catch(_e){ /* ignore */ }
     }
 
     if(!initial.mapUrl) initial.mapUrl = qs("map") || qs("mapUrl") || qs("url") || qs("dataUrl") || "";
@@ -655,9 +526,6 @@
     initial.footer = qs("footer") || "";
 
     setIf("mapUrl", initial.mapUrl);
-    setIf("layoutMode", initial.layoutMode || "single");
-    // If payload provides maps, lock mapUrl editing (it would desync)
-    if(initial.maps && $("mapUrl")) $("mapUrl").setAttribute("disabled","disabled");
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
     setIf("vmin", initial.vmin);
@@ -780,34 +648,13 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
-      const layout = ($("layoutMode") ? $("layoutMode").value : "single");
       let mapUrl = ($("mapUrl").value||"").trim();
-
-      // Multi-map mode requires payload.maps (sent by the visor)
-      const maps = (layout === "triple") ? (initial.maps && Array.isArray(initial.maps) ? initial.maps : null) : null;
-
-      if(layout === "triple"){
-        if(!maps || maps.length < 3){
-          setErr(t("missingMaps"));
-          return;
-        }
-        // Validate URLs (helps diagnose truncated payloads / parsing issues)
-        const bad = maps.map((m,i)=>({i, url:(m && (m.dataUrl || m.mapUrl || m.url || m.map))||""}))
-                        .filter(x=>!x.url || typeof x.url!=="string" || x.url.trim().length<20);
-        if(bad.length){
-          const detail = bad.map(b=>`#${b.i+1}`).join(", ");
-          setErr(t("missingMaps")+"  "+`(sin URL en: ${detail})`);
-          return;
-        }
-      } else {
-        if(!mapUrl){
-          setErr(t("missingMap"));
-          return;
-        }
+      if(!mapUrl){
+        setErr(t("missingMap"));
+        return;
       }
 
-
-const posterW = parseInt($("posterW").value,10) || 3200;
+    const posterW = parseInt($("posterW").value,10) || 3200;
     let S = posterW / 2400;
     S = Math.max(1.0, Math.min(2.0, S));
 
@@ -841,29 +688,50 @@ const posterW = parseInt($("posterW").value,10) || 3200;
 
       // load map(s) (try with CORS, fallback without)
       let img=null;
-      let imgs=null;
-      if(layout === "triple"){
-        imgs = [];
-        for(let i=0;i<3;i++){
-          const m = maps[i] || {};
-          let url = String(m.dataUrl || m.mapUrl || m.url || "").trim();
-          if (!url && m && m.ti && m.tk) { url = `https://earthengine.googleapis.com/api/thumb?thumbid=${m.ti}&token=${m.tk}`; }
-          url = expandThumbUrl(url, 0.10);
-          try{ imgs[i] = await loadImage(url, true); }
-          catch(_e1){
-            try{ imgs[i] = await loadImage(url, false); }
-            catch(_e2){ setErr(t("loadFail")); return; }
-          }
-        }
-      } else {
-        mapUrl = expandThumbUrl(mapUrl, 0.10);
-        try{ img = await loadImage(mapUrl, true); }
+
+      // If payload provided multiple maps, compose them side-by-side into a single image.
+      const mapsList = (window.__payloadMaps && window.__payloadMaps.length) ? window.__payloadMaps.slice(0,3)
+                      : [mapUrl];
+
+      async function loadOne(u){
+        u = expandThumbUrl((u||"").trim(), 0.10);
+        try{ return await loadImage(u, true); }
         catch(_e1){
-          try{ img = await loadImage(mapUrl, false); }
-          catch(_e2){ setErr(t("loadFail")); return; }
+          try{ return await loadImage(u, false); }
+          catch(_e2){ return null; }
         }
       }
-}
+
+      if(mapsList.length>=3){
+        const im1 = await loadOne(mapsList[0]);
+        const im2 = await loadOne(mapsList[1]);
+        const im3 = await loadOne(mapsList[2]);
+        if(!im1 || !im2 || !im3){
+          setErr(t("loadFail"));
+          return;
+        }
+        // Normalize heights and concatenate with gutters.
+        const Ht = Math.max(im1.height, im2.height, im3.height);
+        const s1 = Ht / im1.height, s2 = Ht / im2.height, s3 = Ht / im3.height;
+        const w1 = Math.round(im1.width * s1), w2 = Math.round(im2.width * s2), w3 = Math.round(im3.width * s3);
+        const gut = 24;
+        const off = document.createElement("canvas");
+        off.width = w1 + w2 + w3 + gut*2;
+        off.height = Ht;
+        const oc = off.getContext("2d");
+        oc.fillStyle = "#ffffff";
+        oc.fillRect(0,0,off.width,off.height);
+        oc.drawImage(im1, 0, 0, w1, Ht);
+        oc.drawImage(im2, w1+gut, 0, w2, Ht);
+        oc.drawImage(im3, w1+gut+w2+gut, 0, w3, Ht);
+        img = off; // canvas works with ctx.drawImage
+      } else {
+        img = await loadOne(mapsList[0]);
+        if(!img){
+          setErr(t("loadFail"));
+          return;
+        }
+      }
 
     const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
@@ -915,151 +783,102 @@ const posterW = parseInt($("posterW").value,10) || 3200;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    
-    // Draw 1 or 3 maps
+    // aspect fit map
+    const ar = img.width / img.height;
+    const targetAr = innerW / innerH;
+    let drawW, drawH, dx, dy;
+    if(ar > targetAr){
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
+    } else {
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
+    }
+
+    // frame + clip
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
+    ctx.fillStyle = "#cfe8f3";
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.fill();
+
+    ctx.strokeStyle="rgba(0,0,0,0.12)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.stroke();
+
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
+    const cx = dx + drawW/2;
+    const cy = dy + drawH/2;
+    drawW = drawW * ZOOM;
+    drawH = drawH * ZOOM;
+    dx = cx - drawW/2;
+    dy = cy - drawH/2;
+
+    ctx.save();
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+    ctx.restore();
+    // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
-    function drawOneMap(imgObj, x, y, w, h, mapMeta, drawOverlays){
-      // inner padding for rounded border breathing room
-      const inset = Math.round(0*S);
-      const innerX = x + inset;
-      const innerY = y + inset;
-      const innerW = w - inset*2;
-      const innerH = h - inset*2;
-
-      // aspect fit (cover-like, keeping full box filled)
-      const ar = imgObj.width / imgObj.height;
-      const targetAr = innerW / innerH;
-      let drawW, drawH, dx, dy;
-      if(ar > targetAr){
-        drawH = innerH;
-        drawW = drawH * ar;
-      } else {
-        drawW = innerW;
-        drawH = drawW / ar;
-      }
-      // center
-      dx = innerX + (innerW - drawW)/2;
-      dy = innerY + (innerH - drawH)/2;
-
-      // optional slight zoom to avoid 1px borders
-      const ZOOM = 1.02;
-      const cx = innerX + innerW/2;
-      const cy = innerY + innerH/2;
-      drawW = drawW * ZOOM;
-      drawH = drawH * ZOOM;
-      dx = cx - drawW/2;
-      dy = cy - drawH/2;
-
-      ctx.save();
-      drawRoundedRect(ctx, x, y, w, h, Math.round(22*S));
-      ctx.clip();
-      ctx.drawImage(imgObj, dx, dy, drawW, drawH);
-      ctx.restore();
-
-      // small label (top-left) for multi-map
-      if(mapMeta && mapMeta.label){
-        ctx.save();
-        ctx.globalAlpha = 0.92;
-        ctx.fillStyle = "#fff";
-        const lp = Math.round(12*S);
-        ctx.font = "800 "+Math.round(18*S)+"px system-ui, sans-serif";
-        const text = sanitize(mapMeta.label);
-        const tw = ctx.measureText(text).width;
-        const boxW = Math.round(tw + lp*2);
-        const boxH = Math.round(32*S);
-        drawRoundedRect(ctx, x+Math.round(18*S), y+Math.round(18*S), boxW, boxH, Math.round(12*S));
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#111";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(text, x+Math.round(18*S)+lp, y+Math.round(18*S)+boxH/2);
-        ctx.restore();
-      }
-
-      if(!drawOverlays) return;
-
-      const showLegend = $("showLegend").checked;
-      const showNorth  = $("showNorth").checked;
-      const showScale  = $("showScale").checked;
-
-      const vminL = (mapMeta && mapMeta.vmin !== undefined) ? mapMeta.vmin : vmin;
-      const vmaxL = (mapMeta && mapMeta.vmax !== undefined) ? mapMeta.vmax : vmax;
-      const unitL = (mapMeta && mapMeta.unit !== undefined) ? mapMeta.unit : unit;
-      const palL  = (mapMeta && mapMeta.palette) ? mapMeta.palette : palette;
-
-      if(showNorth && (!mapMeta || mapMeta.isFirst)){
-        drawNorthArrow(ctx, x + w - Math.round(90*S), y + Math.round(110*S), Math.round(34*S));
-      }
-
-      if(showScale && (!mapMeta || mapMeta.isFirst)){
+    if(showNorth){
+      drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
+    }
+      if(showScale){
+        // 1) manual override
         let km = Number(scaleKm);
-        let scalePxLocal = parseInt(($("scalePx") && $("scalePx").value) || "180",10) || 180;
-        if(!(isFinite(km) && km>0) && (mapMeta && mapMeta.bbox)){
-          const b = mapMeta.bbox;
-          const midLat = (b.n + b.s)/2;
-          const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-          const kmPerPx = bboxWidthKm / Math.max(1, w);
-          const targetKm = kmPerPx * scalePxLocal;
-          km = niceKm(targetKm);
-          scalePxLocal = Math.round(km / kmPerPx);
-        } else if(!(isFinite(km) && km>0) && initial.bbox){
+        // 2) auto-scale from bbox if available
+        if(!(isFinite(km) && km>0) && initial.bbox){
           const b = initial.bbox;
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-          const kmPerPx = bboxWidthKm / Math.max(1, w);
-          const targetKm = kmPerPx * scalePxLocal;
+          // Use the actual drawn map width (drawW) to compute km/px
+          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
+          const targetKm = kmPerPx * scalePx;
           km = niceKm(targetKm);
-          scalePxLocal = Math.round(km / kmPerPx);
+          // keep the bar visually consistent: adjust pixels to match the chosen nice km
+          scalePx = Math.round(km / kmPerPx);
         }
         if(isFinite(km) && km>0){
           const scaleMargin = Math.round(34*S);
-          const scaleY = y + h - scaleMargin;
-          const scaleX = (scaleSide==="right") ? (x + w - scaleMargin - scalePxLocal) : (x + scaleMargin);
-          drawScaleBar(ctx, scaleX, scaleY, scalePxLocal, km + " km", S);
+          const scaleY = mapY + mapH - scaleMargin;
+          const scaleX = (scaleSide==="right") ? (mapX + mapW - scaleMargin - scalePx) : (mapX + scaleMargin);
+          drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
         }
       }
+    if(showLegend){
+      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      const legH = Math.round(140*S);
+      const legMargin = Math.round(26*S);
 
-      if(showLegend){
-        const legW = Math.min(Math.round(620*S), Math.round(w * 0.60));
-        const legH = Math.round(140*S);
-        const legMargin = Math.round(26*S);
-        const legX = (legendSide==="left") ? (x + legMargin) : (x + w - legW - legMargin);
-        let legY = y + h - legH - legMargin;
-        // stack above scale if same side
-        if(showScale && legendSide === scaleSide){
-          const scaleStackH = Math.round(54*S);
-          const gap = Math.round(14*S);
-          legY = y + h - legH - legMargin - scaleStackH - gap;
-        }
-        legY = Math.max(y + legMargin, legY);
-        drawLegend(ctx, legX, legY, legW, legH, vminL, vmaxL, unitL, palL, S);
+      // Base position by side
+      const legX = (legendSide==="left")
+        ? (mapX + legMargin)
+        : (mapX + mapW - legW - legMargin);
+
+      // If scale is on and same side, stack legend above the scale bar
+      let legY = mapY + mapH - legH - legMargin;
+      if(showScale && legendSide === scaleSide){
+        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+        const gap = Math.round(14*S);
+        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
       }
+      // Safety clamp (avoid going above the map)
+      legY = Math.max(mapY + legMargin, legY);
+
+      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
 
-    if(layout === "triple"){
-      const gap = Math.round(28*S);
-      const subW = Math.floor((mapW - gap*2) / 3);
-      const subH = mapH;
-      for(let i=0;i<3;i++){
-        const x = mapX + i*(subW + gap);
-        const meta = { isFirst: (i===0),
-          label: (maps[i] && (maps[i].label || maps[i].meta?.date)) || "",
-          bbox: maps[i] && maps[i].bbox ? maps[i].bbox : null,
-          vmin: maps[i] && maps[i].meta ? maps[i].meta.min : vmin,
-          vmax: maps[i] && maps[i].meta ? maps[i].meta.max : vmax,
-          unit: maps[i] && maps[i].meta ? maps[i].meta.unit : unit,
-          palette: maps[i] && maps[i].meta ? maps[i].meta.palette : palette
-        };
-                drawOneMap(imgs[i], x, mapY, subW, subH, meta, true);
-      }
-    } else {
-      drawOneMap(img, mapX, mapY, mapW, mapH, {bbox: initial.bbox}, true);
-    }
-
-if(showFooter){
+    if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
       ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
       ctx.textAlign="right"; 
