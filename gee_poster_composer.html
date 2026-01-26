@@ -770,6 +770,7 @@
     // aspect fit map
     // aspect fit map (single-map) OR compute panel geometry (multi)
     let drawW = innerW, drawH = innerH, dx = innerX, dy = innerY;
+    let scaleRefDrawW = drawW; // used for scale bar (updated in multi-panel)
 
     if (!(imgs && imgs.length >= 2)) {
       // --- single map: fit + slight zoom ---
@@ -806,17 +807,18 @@
       ctx.imageSmoothingEnabled = false;
 
       const gap = Math.round(18*S);
-      const innerX = mapX + pad;
-      const innerY = mapY + pad;
-      const innerW = mapW - 2*pad;
-      const innerH = mapH - 2*pad;
+      const multiPad = Math.round(28*S);
+      const innerX = mapX + multiPad;
+      const innerY = mapY + multiPad;
+      const innerW = mapW - 2*multiPad;
+      const innerH = mapH - 2*multiPad;
 
       const nPanels = imgs.length;
       const panelW = Math.floor((innerW - (nPanels-1)*gap) / nPanels);
       const panelH = innerH;
 
       const labels = (initial && Array.isArray(initial._labels)) ? initial._labels : [];
-      const labelFont = Math.round(28*S);
+      const labelFont = Math.round(34*S);
       const labelPadX = Math.round(10*S);
       const labelPadY = Math.round(6*S);
       const labelR = Math.round(10*S);
@@ -833,6 +835,7 @@
         const r = Math.min(panelW/iw, panelH/ih);
         const dw = iw*r;
         const dh = ih*r;
+        if(i===0){ scaleRefDrawW = dw; }
         const dxp = px + (panelW - dw)/2;
         const dyp = py + (panelH - dh)/2;
 
@@ -878,7 +881,7 @@
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
           // Use the actual drawn map width (drawW) to compute km/px
-          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
+          const kmPerPx = bboxWidthKm / Math.max(1, scaleRefDrawW);
           const targetKm = kmPerPx * scalePx;
           km = niceKm(targetKm);
           // keep the bar visually consistent: adjust pixels to match the chosen nice km
