@@ -818,7 +818,7 @@
       const panelH = innerH;
 
       const labels = (initial && Array.isArray(initial._labels)) ? initial._labels : [];
-      const labelFont = Math.round(34*S);
+      const labelFont = Math.round(28*S);
       const labelPadX = Math.round(10*S);
       const labelPadY = Math.round(6*S);
       const labelR = Math.round(10*S);
@@ -849,7 +849,7 @@
           const bx = px + (panelW - (tw + 2*labelPadX))/2;
           const bh = labelFont + 2*labelPadY;
           const bw = tw + 2*labelPadX;
-          const by = Math.max(py + Math.round(10*S), dyp - (bh + Math.round(8*S)));
+          const by = Math.max(py + Math.round(6*S), dyp - (bh + Math.round(4*S)));
 
           ctx.fillStyle = "rgba(255,255,255,0.80)";
           drawRoundedRect(ctx, bx, by, bw, bh, labelR);
@@ -895,8 +895,8 @@
         }
       }
     if(showLegend){
-      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(140*S);
+      const legW = Math.min(Math.round(560*S), Math.round(mapW * 0.38));
+      const legH = Math.round(128*S);
       const legMargin = Math.round(26*S);
 
       // Base position by side
