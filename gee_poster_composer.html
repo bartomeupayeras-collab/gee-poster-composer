@@ -767,44 +767,35 @@
     const innerY = mapY + inset;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
-
     // aspect fit map
-    const ar = img.width / img.height;
-    const targetAr = innerW / innerH;
-    let drawW, drawH, dx, dy;
-    if(ar > targetAr){
-      drawW = innerW;
-      drawH = innerW / ar;
-      dx = innerX;
-      dy = innerY + (innerH - drawH)/2;
-    } else {
-      drawH = innerH;
-      drawW = innerH * ar;
-      dx = innerX + (innerW - drawW)/2;
-      dy = innerY;
+    // aspect fit map (single-map) OR compute panel geometry (multi)
+    let drawW = innerW, drawH = innerH, dx = innerX, dy = innerY;
+
+    if (!(imgs && imgs.length >= 2)) {
+      // --- single map: fit + slight zoom ---
+      const ar = img.width / img.height;
+      const targetAr = innerW / innerH;
+      if (ar > targetAr) {
+        drawW = innerW;
+        drawH = innerW / ar;
+        dx = innerX;
+        dy = innerY + (innerH - drawH) / 2;
+      } else {
+        drawH = innerH;
+        drawW = innerH * ar;
+        dx = innerX + (innerW - drawW) / 2;
+        dy = innerY;
+      }
+
+      // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+      const ZOOM = 1.12;
+      const cx = dx + drawW / 2;
+      const cy = dy + drawH / 2;
+      drawW = drawW * ZOOM;
+      drawH = drawH * ZOOM;
+      dx = cx - drawW / 2;
+      dy = cy - drawH / 2;
     }
-
-    // frame + clip
-
-    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
-    // keep a subtle rounded frame + border only
-    ctx.fillStyle = "#cfe8f3";
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.fill();
-
-    ctx.strokeStyle="rgba(0,0,0,0.12)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.stroke();
-
-    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
-    const ZOOM = 1.12;
-    const cx = dx + drawW/2;
-    const cy = dy + drawH/2;
-    drawW = drawW * ZOOM;
-    drawH = drawH * ZOOM;
-    dx = cx - drawW/2;
-    dy = cy - drawH/2;
 
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
