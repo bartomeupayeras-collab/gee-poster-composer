@@ -847,9 +847,9 @@
           ctx.font = "600 " + labelFont + "px system-ui, -apple-system, Segoe UI, Roboto, Arial";
           const tw = ctx.measureText(lab).width;
           const bx = px + (panelW - (tw + 2*labelPadX))/2;
-          const by = Math.max(py + Math.round(10*S), dyp - (bh + Math.round(8*S)));
-          const bw = tw + 2*labelPadX;
           const bh = labelFont + 2*labelPadY;
+          const bw = tw + 2*labelPadX;
+          const by = Math.max(py + Math.round(10*S), dyp - (bh + Math.round(8*S)));
 
           ctx.fillStyle = "rgba(255,255,255,0.80)";
           drawRoundedRect(ctx, bx, by, bw, bh, labelR);
