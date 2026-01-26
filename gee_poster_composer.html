@@ -465,19 +465,15 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        // Multi-map payload support (e.g., payload.maps = [{dataUrl},...])
-        window.__payloadMaps = null;
-        try{
-          if(payload && Array.isArray(payload.maps)){
-            const urls = payload.maps.map(function(m){
-              if(!m) return "";
-              if(typeof m === "string") return m;
-              return m.dataUrl || m.mapUrl || m.map || m.url || "";
-            }).filter(function(u){ return (u||"").trim(); });
-            if(urls.length){ window.__payloadMaps = urls; initial.mapUrl = urls[0]; }
-          }
-        }catch(_emap){ window.__payloadMaps = null; }
 
+        // Multi-map (3 maps) support: payload.maps + optional payload.labels
+        if (payload && Array.isArray(payload.maps) && payload.maps.length) {
+          initial._maps = payload.maps.map(m => (m && (m.dataUrl || m.url || m.mapUrl || m.map)) ? (m.dataUrl || m.url || m.mapUrl || m.map) : "").filter(Boolean);
+          initial._labels = Array.isArray(payload.labels) ? payload.labels.map(x => String(x)) : [];
+          // expose for render()
+          window.__PAYLOAD_MAPS__ = initial._maps;
+          window.__PAYLOAD_LABELS__ = initial._labels;
+        }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -648,7 +644,70 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
+
       let mapUrl = ($("mapUrl").value||"").trim();
+
+      // If launched with payload.maps (3 maps), build a side-by-side mosaic first.
+      if((!mapUrl || mapUrl==="") && Array.isArray(window.__PAYLOAD_MAPS__) && window.__PAYLOAD_MAPS__.length){
+        const urls = window.__PAYLOAD_MAPS__.slice(0,3);
+        const labels = Array.isArray(window.__PAYLOAD_LABELS__) ? window.__PAYLOAD_LABELS__.slice(0,3) : [];
+        try{
+          const imgs = [];
+          for(const u0 of urls){
+            const u = expandThumbUrl(u0, 0.10);
+            try{ imgs.push(await loadImage(u, true)); }
+            catch(_e1){ imgs.push(await loadImage(u, false)); }
+          }
+          const sep = 30; // px
+          const targetH = Math.max(...imgs.map(im=>im.naturalHeight||im.height||1));
+          const widths = imgs.map(im=>Math.max(1, Math.round((im.naturalWidth||im.width||1) * (targetH / (im.naturalHeight||im.height||1)))));
+          const Wm = widths.reduce((a,b)=>a+b,0) + sep*(imgs.length-1);
+          const Hm = targetH;
+
+          const off = document.createElement("canvas");
+          off.width = Wm; off.height = Hm;
+          const oc = off.getContext("2d");
+          oc.imageSmoothingEnabled = false;
+          oc.fillStyle = "#cfe8f3";
+          oc.fillRect(0,0,Wm,Hm);
+
+          let x=0;
+          for(let i=0;i<imgs.length;i++){
+            const im = imgs[i];
+            const w = widths[i];
+            oc.imageSmoothingEnabled = false;
+            oc.drawImage(im, x, 0, w, Hm);
+
+            // label (year / Δ) on each panel
+            const lab = labels[i] || "";
+            if(lab){
+              oc.save();
+              oc.imageSmoothingEnabled = false;
+              oc.font = "900 28px system-ui, sans-serif";
+              oc.textBaseline = "top";
+              oc.textAlign = "left";
+              const pad = 10;
+              const tw = oc.measureText(lab).width;
+              oc.fillStyle = "rgba(255,255,255,0.85)";
+              oc.fillRect(x+12, 12, tw + pad*2, 40);
+              oc.fillStyle = "#111";
+              oc.fillText(lab, x+12+pad, 14);
+              oc.restore();
+            }
+
+            x += w + sep;
+          }
+
+          mapUrl = off.toDataURL("image/png");
+          // ensure the field is populated so the UI matches
+          setIf("mapUrl", mapUrl);
+          window.__IS_MOSAIC3__ = true;
+        } catch(e){
+          // fallback: if mosaic fails, keep default behaviour
+          console.warn("mosaic_build_fail", e);
+        }
+      }
+
       if(!mapUrl){
         setErr(t("missingMap"));
         return;
@@ -686,52 +745,13 @@
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      // load map(s) (try with CORS, fallback without)
+      // load map (try with CORS, fallback without)
       let img=null;
-
-      // If payload provided multiple maps, compose them side-by-side into a single image.
-      const mapsList = (window.__payloadMaps && window.__payloadMaps.length) ? window.__payloadMaps.slice(0,3)
-                      : [mapUrl];
-
-      async function loadOne(u){
-        u = expandThumbUrl((u||"").trim(), 0.10);
-        try{ return await loadImage(u, true); }
-        catch(_e1){
-          try{ return await loadImage(u, false); }
-          catch(_e2){ return null; }
-        }
-      }
-
-      const MULTI3 = (mapsList.length>=3);
-      if(MULTI3){
-        const im1 = await loadOne(mapsList[0]);
-        const im2 = await loadOne(mapsList[1]);
-        const im3 = await loadOne(mapsList[2]);
-        if(!im1 || !im2 || !im3){
-          setErr(t("loadFail"));
-          return;
-        }
-        // Normalize heights and concatenate with gutters.
-        const Ht = Math.max(im1.height, im2.height, im3.height);
-        const s1 = Ht / im1.height, s2 = Ht / im2.height, s3 = Ht / im3.height;
-        const w1 = Math.round(im1.width * s1), w2 = Math.round(im2.width * s2), w3 = Math.round(im3.width * s3);
-        const gut = 24;
-        const off = document.createElement("canvas");
-        off.width = w1 + w2 + w3 + gut*2;
-        off.height = Ht;
-        const oc = off.getContext("2d");
-        // Avoid interpolation halos on coastlines when downscaling/concatenating.
-        oc.imageSmoothingEnabled = false;
-        // Match the poster sea background to prevent edge blending artifacts.
-        oc.fillStyle = "#cfe8f3";
-        oc.fillRect(0,0,off.width,off.height);
-        oc.drawImage(im1, 0, 0, w1, Ht);
-        oc.drawImage(im2, w1+gut, 0, w2, Ht);
-        oc.drawImage(im3, w1+gut+w2+gut, 0, w3, Ht);
-        img = off; // canvas works with ctx.drawImage
-      } else {
-        img = await loadOne(mapsList[0]);
-        if(!img){
+      mapUrl = expandThumbUrl(mapUrl, 0.10);
+      try{ img = await loadImage(mapUrl, true); }
+      catch(_e1){
+        try{ img = await loadImage(mapUrl, false); }
+        catch(_e2){
           setErr(t("loadFail"));
           return;
         }
@@ -816,9 +836,8 @@
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
-    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE.
-    // IMPORTANT: for the 3-map composite, zoom would crop the side maps.
-    const ZOOM = MULTI3 ? 1.0 : 1.12;
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
     const cx = dx + drawW/2;
     const cy = dy + drawH/2;
     drawW = drawW * ZOOM;
@@ -829,10 +848,7 @@
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
-    // Avoid smoothing halos on the 3-map composite.
-    if(MULTI3) ctx.imageSmoothingEnabled = false;
     ctx.drawImage(img, dx, dy, drawW, drawH);
-    if(MULTI3) ctx.imageSmoothingEnabled = true;
     ctx.restore();
     // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
