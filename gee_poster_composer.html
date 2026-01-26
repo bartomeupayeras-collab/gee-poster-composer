@@ -465,14 +465,13 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-
-        // Multi-map (3 maps) support: payload.maps + optional payload.labels
+        // --- 3-map support (optional) ---
         if (payload && Array.isArray(payload.maps) && payload.maps.length) {
-          initial._maps = payload.maps.map(m => (m && (m.dataUrl || m.url || m.mapUrl || m.map)) ? (m.dataUrl || m.url || m.mapUrl || m.map) : "").filter(Boolean);
-          initial._labels = Array.isArray(payload.labels) ? payload.labels.map(x => String(x)) : [];
-          // expose for render()
-          window.__PAYLOAD_MAPS__ = initial._maps;
-          window.__PAYLOAD_LABELS__ = initial._labels;
+          initial._maps = payload.maps.map(function(m){
+            if(!m) return "";
+            return (m.dataUrl || m.url || m.mapUrl || m.map || m.thumbUrl || "");
+          }).filter(Boolean);
+          initial._labels = Array.isArray(payload.labels) ? payload.labels.map(function(x){ return String(x); }) : [];
         }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
@@ -644,22 +643,13 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
-
       let mapUrl = ($("mapUrl").value||"").trim();
-
-      // If launched with payload.maps (3 maps), render as 3 panels (NOT a mosaic image).
-      let __MULTI__ = null;
-      if((!mapUrl || mapUrl==="") && Array.isArray(window.__PAYLOAD_MAPS__) && window.__PAYLOAD_MAPS__.length){
-        const urls = window.__PAYLOAD_MAPS__.slice(0,3);
-        const labels = Array.isArray(window.__PAYLOAD_LABELS__) ? window.__PAYLOAD_LABELS__.slice(0,3) : [];
-        __MULTI__ = { urls, labels, imgs: [] };
-      }
-
-      if(!mapUrl && !__MULTI__){
+      if(!mapUrl){
         setErr(t("missingMap"));
         return;
       }
-          const posterW = parseInt($("posterW").value,10) || 3200;
+
+    const posterW = parseInt($("posterW").value,10) || 3200;
     let S = posterW / 2400;
     S = Math.max(1.0, Math.min(2.0, S));
 
@@ -692,28 +682,41 @@
     setCanvasSize(outW,outH);
 
       // load map(s) (try with CORS, fallback without)
-      let img=null;
-      let imgs=null;
-      if(__MULTI__){
-        imgs = [];
-        for(const u0 of __MULTI__.urls){
-          const u = expandThumbUrl(u0, 0.10);
-          try{ imgs.push(await loadImage(u, true)); }
-          catch(_e1){
-            try{ imgs.push(await loadImage(u, false)); }
-            catch(_e2){ setErr(t("loadFail")); return; }
-          }
-        }
-      } else {
-        mapUrl = expandThumbUrl(mapUrl, 0.10);
-        try{ img = await loadImage(mapUrl, true); }
+      const multi = (initial && Array.isArray(initial._maps) && initial._maps.length === 3);
+      let img = null;
+      let imgs = null;
+
+      async function loadOne(u){
+        u = expandThumbUrl(u, 0.10);
+        try{ return await loadImage(u, true); }
         catch(_e1){
-          try{ img = await loadImage(mapUrl, false); }
-          catch(_e2){ setErr(t("loadFail")); return; }
+          try{ return await loadImage(u, false); }
+          catch(_e2){ return null; }
         }
       }
 
-const W=outW, H=outH;
+      if(multi){
+        imgs = [];
+        for(let i=0;i<3;i++){
+          const u = (initial._maps[i]||"").trim();
+          const im = await loadOne(u);
+          if(!im){ setErr(t("loadFail")); return; }
+          imgs.push(im);
+        }
+      }else{
+        let mapUrl0 = mapUrl;
+        mapUrl0 = expandThumbUrl(mapUrl0, 0.10);
+        try{ img = await loadImage(mapUrl0, true); }
+        catch(_e1){
+          try{ img = await loadImage(mapUrl0, false); }
+          catch(_e2){
+            setErr(t("loadFail"));
+            return;
+          }
+        }
+      }
+
+    const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
@@ -763,7 +766,26 @@ const W=outW, H=outH;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // frame background + border
+    // aspect fit map
+    const ar = img.width / img.height;
+    const targetAr = innerW / innerH;
+    let drawW, drawH, dx, dy;
+    if(ar > targetAr){
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
+    } else {
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
+    }
+
+    // frame + clip
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
     ctx.fillStyle = "#cfe8f3";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
@@ -773,148 +795,80 @@ const W=outW, H=outH;
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
+    const cx = dx + drawW/2;
+    const cy = dy + drawH/2;
+    drawW = drawW * ZOOM;
+    drawH = drawH * ZOOM;
+    dx = cx - drawW/2;
+    dy = cy - drawH/2;
 
-// Draw map content
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
 
-    if(imgs){
-      // 3-panel layout (for 1 island across 3 years OR 2 years + Δ)
-      const panels = Math.min(3, imgs.length);
-      const sep = Math.round(26*S);
-      const panelW = (innerW - sep*(panels-1)) / panels;
-      const panelH = innerH;
-
+    if (imgs && imgs.length === 3) {
+      // 3 side-by-side panels, no zoom, no smoothing (avoid fake edge pixels)
       ctx.imageSmoothingEnabled = false;
 
-      for(let i=0;i<panels;i++){
-        const im = imgs[i];
-        const px = innerX + i*(panelW + sep);
+      const gap = Math.round(18*S);
+      const innerX = mapX + pad;
+      const innerY = mapY + pad;
+      const innerW = mapW - 2*pad;
+      const innerH = mapH - 2*pad;
+
+      const panelW = Math.floor((innerW - 2*gap) / 3);
+      const panelH = innerH;
+
+      const labels = (initial && Array.isArray(initial._labels)) ? initial._labels : [];
+      const labelFont = Math.round(28*S);
+      const labelPadX = Math.round(10*S);
+      const labelPadY = Math.round(6*S);
+      const labelR = Math.round(10*S);
+
+      for (let i=0;i<3;i++){
+        const px = innerX + i*(panelW + gap);
         const py = innerY;
-        const pw = panelW;
-        const ph = panelH;
 
-        // aspect-fit (contain) inside each panel, no zoom
-        const ar = im.width / im.height;
-        const targetAr = pw / ph;
-        let dw, dh, dx, dy;
-        if(ar > targetAr){
-          dw = pw;
-          dh = pw / ar;
-          dx = px;
-          dy = py + (ph - dh)/2;
-        } else {
-          dh = ph;
-          dw = ph * ar;
-          dx = px + (pw - dw)/2;
-          dy = py;
-        }
+        const im = imgs[i];
+        const iw = im.naturalWidth || im.width;
+        const ih = im.naturalHeight || im.height;
 
-        ctx.drawImage(im, dx, dy, dw, dh);
+        // contain fit
+        const r = Math.min(panelW/iw, panelH/ih);
+        const dw = iw*r;
+        const dh = ih*r;
+        const dxp = px + (panelW - dw)/2;
+        const dyp = py + (panelH - dh)/2;
 
-        // label (year / Δ) centered at top of each panel
-        const lab = (__MULTI__ && __MULTI__.labels && __MULTI__.labels[i]) ? __MULTI__.labels[i] : "";
+        ctx.drawImage(im, dxp, dyp, dw, dh);
+
+        // label (year / Δ) at top center of each panel
+        const lab = labels[i] || "";
         if(lab){
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          const fontPx = Math.round(38*S);
-          ctx.font = "900 " + fontPx + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-          ctx.textBaseline = "top";
-          ctx.textAlign = "center";
+          ctx.font = "600 " + labelFont + "px system-ui, -apple-system, Segoe UI, Roboto, Arial";
           const tw = ctx.measureText(lab).width;
-          const padB = Math.round(10*S);
-          const boxW = tw + padB*2;
-          const boxH = Math.round(fontPx*1.25);
-          const bx = px + pw/2 - boxW/2;
-          const by = py + Math.round(14*S);
-          ctx.fillStyle = "rgba(255,255,255,0.88)";
-          ctx.fillRect(bx, by, boxW, boxH);
-          ctx.fillStyle = "#111";
-          ctx.fillText(lab, px + pw/2, by + Math.round(6*S));
-          ctx.restore();
+          const bx = px + (panelW - (tw + 2*labelPadX))/2;
+          const by = py + Math.round(10*S);
+          const bw = tw + 2*labelPadX;
+          const bh = labelFont + 2*labelPadY;
+
+          ctx.fillStyle = "rgba(255,255,255,0.80)";
+          drawRoundedRect(ctx, bx, by, bw, bh, labelR);
+          ctx.fill();
+
+          ctx.fillStyle = "rgba(0,0,0,0.80)";
+          ctx.textBaseline = "top";
+          ctx.fillText(lab, bx + labelPadX, by + labelPadY);
         }
       }
     } else {
-      // Single map: aspect fit + gentle zoom
-      const ar = img.width / img.height;
-      const targetAr = innerW / innerH;
-      let drawW, drawH, dx, dy;
-      if(ar > targetAr){
-        drawW = innerW;
-        drawH = innerW / ar;
-        dx = innerX;
-        dy = innerY + (innerH - drawH)/2;
-      } else {
-        drawH = innerH;
-        drawW = innerH * ar;
-        dx = innerX + (innerW - drawW)/2;
-        dy = innerY;
-      }
-
-      const ZOOM = 1.12;
-      const cx = dx + drawW/2;
-      const cy = dy + drawH/2;
-      drawW = drawW * ZOOM;
-      drawH = drawH * ZOOM;
-      dx = cx - drawW/2;
-      dy = cy - drawH/2;
-
       ctx.drawImage(img, dx, dy, drawW, drawH);
     }
 
     ctx.restore();
-
-);
-          ctx.imageSmoothingEnabled = false;
-          const fontPx = Math.round(38*S);
-          ctx.font = "900 " + fontPx + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-          ctx.textBaseline = "top";
-          ctx.textAlign = "center";
-          const tw = ctx.measureText(lab).width;
-          const padB = Math.round(10*S);
-          const boxW = tw + padB*2;
-          const boxH = Math.round(fontPx*1.25);
-          const bx = px + pw/2 - boxW/2;
-          const by = py + Math.round(14*S);
-          ctx.fillStyle = "rgba(255,255,255,0.88)";
-          ctx.fillRect(bx, by, boxW, boxH);
-          ctx.fillStyle = "#111";
-          ctx.fillText(lab, px + pw/2, by + Math.round(6*S));
-          ctx.restore();
-        }
-      }
-    } else {
-      // Single map: aspect fit + gentle zoom
-      const ar = img.width / img.height;
-      const targetAr = innerW / innerH;
-      let drawW, drawH, dx, dy;
-      if(ar > targetAr){
-        drawW = innerW;
-        drawH = innerW / ar;
-        dx = innerX;
-        dy = innerY + (innerH - drawH)/2;
-      } else {
-        drawH = innerH;
-        drawW = innerH * ar;
-        dx = innerX + (innerW - drawW)/2;
-        dy = innerY;
-      }
-
-      const ZOOM = 1.12;
-      const cx = dx + drawW/2;
-      const cy = dy + drawH/2;
-      drawW = drawW * ZOOM;
-      drawH = drawH * ZOOM;
-      dx = cx - drawW/2;
-      dy = cy - drawH/2;
-
-      ctx.drawImage(img, dx, dy, drawW, drawH);
-    }
-
-    ctx.restore();
-
-// overlays
+    // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
