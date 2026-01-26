@@ -682,7 +682,9 @@
     setCanvasSize(outW,outH);
 
       // load map(s) (try with CORS, fallback without)
-      const multi = (initial && Array.isArray(initial._maps) && initial._maps.length === 3);
+      const multi = (initial && Array.isArray(initial._maps) && initial._maps.length >= 2);
+      // Fallback: if we have at least 1 map in _maps but no single mapUrl, use the first
+      if (initial && Array.isArray(initial._maps) && initial._maps.length >= 1 && !initial.mapUrl) { initial.mapUrl = initial._maps[0]; }
       let img = null;
       let imgs = null;
 
@@ -697,7 +699,7 @@
 
       if(multi){
         imgs = [];
-        for(let i=0;i<3;i++){
+        for(let i=0;i<initial._maps.length;i++){
           const u = (initial._maps[i]||"").trim();
           const im = await loadOne(u);
           if(!im){ setErr(t("loadFail")); return; }
@@ -808,7 +810,7 @@
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
 
-    if (imgs && imgs.length === 3) {
+    if (imgs && imgs.length >= 2) {
       // 3 side-by-side panels, no zoom, no smoothing (avoid fake edge pixels)
       ctx.imageSmoothingEnabled = false;
 
@@ -818,7 +820,8 @@
       const innerW = mapW - 2*pad;
       const innerH = mapH - 2*pad;
 
-      const panelW = Math.floor((innerW - 2*gap) / 3);
+      const nPanels = imgs.length;
+      const panelW = Math.floor((innerW - (nPanels-1)*gap) / nPanels);
       const panelH = innerH;
 
       const labels = (initial && Array.isArray(initial._labels)) ? initial._labels : [];
@@ -827,7 +830,7 @@
       const labelPadY = Math.round(6*S);
       const labelR = Math.round(10*S);
 
-      for (let i=0;i<3;i++){
+      for (let i=0;i<nPanels;i++){
         const px = innerX + i*(panelW + gap);
         const py = innerY;
 
