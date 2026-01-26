@@ -407,6 +407,7 @@
 
     const barX=x+pad, barY=y+Math.round(56*S), barW=w-(pad*2), barH=Math.round(16*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
+    palette = normalizePalette(palette, ["#b08d57","#efe9d6","#0f766e"]);
     const stops=Math.max(1,palette.length-1);
     for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
     ctx.fillStyle=grad;
@@ -425,6 +426,83 @@
 
     ctx.restore();
   }
+
+  function normalizePalette(pal, fallback){
+    let arr = [];
+    if(Array.isArray(pal)) arr = pal.slice();
+    else if(typeof pal === "string") arr = pal.split(",").map(s=>s.trim()).filter(Boolean);
+    // Ensure colors look like valid CSS; if not, fallback.
+    if(arr.length < 2) arr = (fallback && fallback.length>=2) ? fallback.slice() : ["#888","#222"];
+    return arr;
+  }
+
+  function drawDoubleLegend(ctx,x,y,w,h, main, diff, S){
+    // One card, two stacked bars (Δ on top, main below)
+    ctx.save();
+    ctx.globalAlpha=.98;
+    ctx.fillStyle="#fff";
+    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle="rgba(0,0,0,0.10)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    ctx.stroke();
+
+    const pad = Math.round(14*S);
+    const titleFont = Math.round(22*S);
+    const valFont = Math.round(20*S);
+    const barH = Math.round(14*S);
+    const gapY = Math.round(10*S);
+
+    const barX = x+pad;
+    const barW = w-(pad*2);
+
+    // Layout: [Diff title + bar + values] then [Main title + bar + values]
+    let cy = y + Math.round(10*S);
+
+    function drawSection(section){
+      const title = section.title || "";
+      const pal = normalizePalette(section.palette, section.fallbackPalette);
+      const vmin = sanitize(section.min);
+      const vmax = sanitize(section.max);
+
+      // Title
+      ctx.fillStyle="#111";
+      ctx.font="900 "+titleFont+"px system-ui, sans-serif";
+      ctx.textAlign="left";
+      ctx.textBaseline="top";
+      ctx.fillText(title, barX, cy);
+
+      // Bar
+      const barY = cy + Math.round(34*S);
+      const grad = ctx.createLinearGradient(barX,0,barX+barW,0);
+      const stops = Math.max(1, pal.length-1);
+      for(let i=0;i<pal.length;i++) grad.addColorStop(i/stops, pal[i]);
+      ctx.fillStyle=grad;
+      drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(8*S));
+      ctx.fill();
+
+      // Values
+      const vy = barY + barH + Math.round(8*S);
+      ctx.fillStyle="#333";
+      ctx.font="900 "+valFont+"px system-ui, sans-serif";
+      ctx.textBaseline="top";
+      ctx.textAlign="left";
+      ctx.fillText(vmin, barX, vy);
+      ctx.textAlign="right";
+      ctx.fillText(vmax, barX+barW, vy);
+
+      // Advance cursor
+      cy = vy + Math.round(26*S) + gapY;
+    }
+
+    drawSection(diff);
+    drawSection(main);
+
+    ctx.restore();
+  }
+
   function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
@@ -923,33 +1001,37 @@
         bottomY -= (scaleStackH + gap);
       }
 
-      const hasDiffLegend = !!(initial._legendDiff && initial._legendDiff.palette && initial._legendDiff.palette.length);
+      const hasDiffLegend = !!(initial._legendDiff && (initial._legendDiff.palette || initial._legendDiff.colors));
       if(hasDiffLegend){
-        const d = initial._legendDiff;
-        const diffMin = (d.min!==undefined && d.min!==null) ? String(d.min) : "";
-        const diffMax = (d.max!==undefined && d.max!==null) ? String(d.max) : "";
-        const diffUnit = (d.unit!==undefined) ? String(d.unit || "") : "";
-        const diffPal = Array.isArray(d.palette) ? d.palette : (String(d.palette||"").split(",").map(s=>s.trim()).filter(Boolean));
+        const d = initial._legendDiff || {};
+        const diffPal = normalizePalette(d.palette, ["#2166ac","#67a9cf","#d1e5f0","#f7f7f7","#fddbc7","#ef8a62","#b2182b"]);
+        const mainPal = normalizePalette(palette, ["#b08d57","#efe9d6","#0f766e"]);
 
-        // Stack: diff legend above, main legend below (closest to bottom)
-        let mainY = bottomY - legH;
-        let diffY = mainY - gap - legH;
+        // Use a single combined legend box so it always fits
+        const legH2 = Math.round(168*S);
+        let legY = bottomY - legH2;
+        legY = Math.max(mapY + legMargin, legY);
 
-        // Safety clamp (avoid going above the map)
-        const minY = mapY + legMargin;
-        if(diffY < minY){
-          diffY = minY;
-          mainY = diffY + legH + gap;
-        }
+        const diffMin = (d.min!==undefined && d.min!==null) ? d.min : "";
+        const diffMax = (d.max!==undefined && d.max!==null) ? d.max : "";
+        const diffTitle = String(d.unit || "Δ (B−A)");
 
-        drawLegend(ctx, legX, diffY, legW, legH, diffMin, diffMax, diffUnit || "Δ", diffPal, S);
-        drawLegend(ctx, legX, mainY, legW, legH, vmin, vmax, unit, palette, S);
+        drawDoubleLegend(
+          ctx,
+          legX,
+          legY,
+          legW,
+          legH2,
+          {title: (unit || t("legend")), min: vmin, max: vmax, palette: mainPal, fallbackPalette: ["#b08d57","#efe9d6","#0f766e"]},
+          {title: diffTitle, min: diffMin, max: diffMax, palette: diffPal, fallbackPalette: ["#2166ac","#67a9cf","#d1e5f0","#f7f7f7","#fddbc7","#ef8a62","#b2182b"]},
+          S
+        );
       } else {
         let legY = bottomY - legH;
         legY = Math.max(mapY + legMargin, legY);
-        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+        const mainPal = normalizePalette(palette, ["#b08d57","#efe9d6","#0f766e"]);
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, mainPal, S);
       }
-    }
 
     if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
