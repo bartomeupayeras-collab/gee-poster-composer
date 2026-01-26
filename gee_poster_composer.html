@@ -844,10 +844,10 @@
         // label (year / Δ) at top center of each panel
         const lab = labels[i] || "";
         if(lab){
-          ctx.font = "600 " + labelFont + "px system-ui, -apple-system, Segoe UI, Roboto, bold Arial";
+          ctx.font = "600 " + labelFont + "px system-ui, -apple-system, Segoe UI, Roboto, Arial";
           const tw = ctx.measureText(lab).width;
           const bx = px + (panelW - (tw + 2*labelPadX))/2;
-          const by = py + Math.round(10*S);
+          const by = Math.max(py + Math.round(10*S), dyp - (bh + Math.round(8*S)));
           const bw = tw + 2*labelPadX;
           const bh = labelFont + 2*labelPadY;
 
