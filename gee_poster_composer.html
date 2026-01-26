@@ -446,7 +446,8 @@
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null
+    dims:null,
+    _legendDiff:null
   };
 
   function loadFromQuery(){
@@ -498,6 +499,16 @@
           if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
           initial.unit = payload.meta.unit || "";
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
+        }
+        // Optional separate legends (main + Δ) for 2 anys + diferència posters
+        if(payload.legendMain){
+          if(payload.legendMain.min!==null && payload.legendMain.min!==undefined) initial.vmin = String(payload.legendMain.min);
+          if(payload.legendMain.max!==null && payload.legendMain.max!==undefined) initial.vmax = String(payload.legendMain.max);
+          if(payload.legendMain.unit!==undefined) initial.unit = String(payload.legendMain.unit || "");
+          if(Array.isArray(payload.legendMain.palette)) initial.palette = payload.legendMain.palette.join(",");
+        }
+        if(payload.legendDiff){
+          initial._legendDiff = payload.legendDiff;
         }
         const f = [
           payload.meta?.island || "",
@@ -898,23 +909,46 @@
       const legW = Math.min(Math.round(560*S), Math.round(mapW * 0.38));
       const legH = Math.round(128*S);
       const legMargin = Math.round(26*S);
+      const gap = Math.round(14*S);
 
       // Base position by side
       const legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
-      // If scale is on and same side, stack legend above the scale bar
-      let legY = mapY + mapH - legH - legMargin;
+      // If scale is on and same side, reserve vertical space for it
+      const scaleStackH = Math.round(54*S); // approx footprint of scale bar + label
+      let bottomY = mapY + mapH - legMargin;
       if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-        const gap = Math.round(14*S);
-        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+        bottomY -= (scaleStackH + gap);
       }
-      // Safety clamp (avoid going above the map)
-      legY = Math.max(mapY + legMargin, legY);
 
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      const hasDiffLegend = !!(initial._legendDiff && initial._legendDiff.palette && initial._legendDiff.palette.length);
+      if(hasDiffLegend){
+        const d = initial._legendDiff;
+        const diffMin = (d.min!==undefined && d.min!==null) ? String(d.min) : "";
+        const diffMax = (d.max!==undefined && d.max!==null) ? String(d.max) : "";
+        const diffUnit = (d.unit!==undefined) ? String(d.unit || "") : "";
+        const diffPal = Array.isArray(d.palette) ? d.palette : (String(d.palette||"").split(",").map(s=>s.trim()).filter(Boolean));
+
+        // Stack: diff legend above, main legend below (closest to bottom)
+        let mainY = bottomY - legH;
+        let diffY = mainY - gap - legH;
+
+        // Safety clamp (avoid going above the map)
+        const minY = mapY + legMargin;
+        if(diffY < minY){
+          diffY = minY;
+          mainY = diffY + legH + gap;
+        }
+
+        drawLegend(ctx, legX, diffY, legW, legH, diffMin, diffMax, diffUnit || "Δ", diffPal, S);
+        drawLegend(ctx, legX, mainY, legW, legH, vmin, vmax, unit, palette, S);
+      } else {
+        let legY = bottomY - legH;
+        legY = Math.max(mapY + legMargin, legY);
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      }
     }
 
     if(showFooter){
