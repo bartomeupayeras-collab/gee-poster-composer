@@ -325,6 +325,30 @@
 
   // ---------- helpers ----------
   const sanitize = (s) => (s===null || s===undefined) ? "" : String(s);
+
+  const normalizeColor = (c) => {
+    if(c===null || c===undefined) return "#000000";
+    let s = String(c).trim();
+    if(!s) return "#000000";
+    // common CSS formats already valid
+    if(s[0]==="#" || s.startsWith("rgb") || s.startsWith("hsl")) return s;
+    // handle 0xAABBCC
+    if(/^0x[0-9a-fA-F]{6}$/.test(s)) return "#" + s.slice(2);
+    // handle plain hex without '#'
+    if(/^[0-9a-fA-F]{6}$/.test(s) || /^[0-9a-fA-F]{3}$/.test(s)) return "#" + s;
+    return s; // fallback (may still be valid color name)
+  };
+
+  const normalizePalette = (p) => {
+    if(Array.isArray(p)) return p.map(normalizeColor);
+    if(typeof p === "string"){
+      // accept formats like "[d7191c, fdae61]" or "d7191c,fdae61"
+      const s = p.replace(/[\[\]\(\)"]/g," ").trim();
+      const parts = s.split(/[,\s]+/).filter(Boolean);
+      return parts.length ? parts.map(normalizeColor) : ["#8c510a","#dfc27d","#f6e8c3","#c7eae5","#5ab4ac","#01665e"];
+    }
+    return ["#8c510a","#dfc27d","#f6e8c3","#c7eae5","#5ab4ac","#01665e"];
+  };
   const setIf = (id, v) => { if(v!==null && v!==undefined && v!=="") $(id).value = v; };
   const setErr = (msg) => {
     const el = $("err");
@@ -385,6 +409,7 @@
     ctx.restore();
   }
   function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
+    palette = normalizePalette(palette);
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
