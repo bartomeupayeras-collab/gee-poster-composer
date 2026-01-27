@@ -439,7 +439,7 @@
   }
 
   function drawLegendDual(ctx,x,y,w,h,main,diff,S){
-    // One container, two stacked bars (diff on top, main on bottom)
+    // One container, two stacked bars (main on top, Δ on bottom)
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
@@ -485,8 +485,9 @@
       if(vmax!==null && vmax!==undefined && vmax!=="") ctx.fillText(String(vmax), barX+barW, barY+barH+Math.round(8*S));
     }
 
-    drawOne(topY, topH, diff.title || "Δ (B−A)", diff.min, diff.max, diff.unit, diff.palette);
-    drawOne(botY, botH, main.title || t("legend"), main.min, main.max, main.unit, main.palette);
+    drawOne(topY, topH, main.title || t("legend"), main.min, main.max, main.unit, main.palette);
+    drawOne(botY, botH, diff.title || "Δ (B−A)", diff.min, diff.max, diff.unit, diff.palette);
+
 
     ctx.restore();
   }
