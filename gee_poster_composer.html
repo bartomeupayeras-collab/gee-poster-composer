@@ -144,10 +144,36 @@
         <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label id="labLegendPos">Posició llegenda</label>
-            <select id="legendSide">
-              <option value="right" selected>Dreta</option>
-              <option value="left">Esquerra</option>
+            <select id="legendPos">
+              <option value="br" selected>Baix-dreta</option>
+              <option value="bl">Baix-esquerra</option>
+              <option value="tr">Dalt-dreta</option>
+              <option value="tl">Dalt-esquerra</option>
+              <option value="custom">Personalitzada</option>
             </select>
+            <div id="legendCustomWrap" style="display:none;margin-top:8px">
+              <div style="display:flex;gap:10px;align-items:center">
+                <div style="flex:1">
+                  <label id="labLegendX" style="margin:0 0 4px 0">X (%)</label>
+                  <input id="legendX" type="range" min="0" max="100" value="100" />
+                </div>
+                <div style="width:54px;text-align:right;font-weight:800;font-size:12px;color:var(--muted)">
+                  <span id="legendXVal">100</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+                <div style="flex:1">
+                  <label id="labLegendY" style="margin:0 0 4px 0">Y (%)</label>
+                  <input id="legendY" type="range" min="0" max="100" value="100" />
+                </div>
+                <div style="width:54px;text-align:right;font-weight:800;font-size:12px;color:var(--muted)">
+                  <span id="legendYVal">100</span>
+                </div>
+              </div>
+              <div id="legendHint" style="margin-top:8px;font-size:11px;color:var(--muted)">
+                Arrossega els sliders per moure la llegenda dins el mapa.
+              </div>
+            </div>
           </div>
           <div style="flex:1">
             <label id="labScalePos">Posició escala</label>
@@ -218,6 +244,8 @@
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
       map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
+      legBR:"Baix-dreta", legBL:"Baix-esquerra", legTR:"Dalt-dreta", legTL:"Dalt-esquerra", legCustom:"Personalitzada",
+      legX:"X (%)", legY:"Y (%)", legHint:"Arrossega els sliders per moure la llegenda dins el mapa.",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
@@ -233,6 +261,8 @@
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
       map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
+      legBR:"Abajo-derecha", legBL:"Abajo-izquierda", legTR:"Arriba-derecha", legTL:"Arriba-izquierda", legCustom:"Personalizada",
+      legX:"X (%)", legY:"Y (%)", legHint:"Mueve los deslizadores para colocar la leyenda dentro del mapa.",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
@@ -257,6 +287,8 @@
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
+      legBR:"Bottom-right", legBL:"Bottom-left", legTR:"Top-right", legTL:"Top-left", legCustom:"Custom",
+      legX:"X (%)", legY:"Y (%)", legHint:"Use the sliders to position the legend inside the map.",
       left:"Left", right:"Right",
     }
   };
@@ -273,15 +305,21 @@
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
     if($("labLegendPos")) $("labLegendPos").textContent = t("legendPos");
-    if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
+    $("labLegendX").textContent = t("legX");
+    $("labLegendY").textContent = t("legY");
+    $("legendHint").textContent = t("legHint");
+if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     // option labels (Left/Right) for legend/scale selects
     const setSideOptionLabels = () => {
-      const legSel = $("legendSide");
+      const legSel = $("legendPos");
       const scSel  = $("scaleSide");
       if(legSel){
         legSel.querySelectorAll("option").forEach(o=>{
-          if(o.value==="left") o.textContent = t("left");
-          if(o.value==="right") o.textContent = t("right");
+          if(o.value==="br") o.textContent = t("legBR");
+          if(o.value==="bl") o.textContent = t("legBL");
+          if(o.value==="tr") o.textContent = t("legTR");
+          if(o.value==="tl") o.textContent = t("legTL");
+          if(o.value==="custom") o.textContent = t("legCustom");
         });
       }
       if(scSel){
@@ -358,18 +396,6 @@
     ctx.arcTo(x,y,x+w,y,r);
     ctx.closePath();
   }
-  function normColor(c){
-    if(c===null || c===undefined) return "#000000";
-    if(typeof c !== "string") c = String(c);
-    c = c.trim();
-    if(!c) return "#000000";
-    if(c.startsWith("0x") || c.startsWith("0X")) c = c.slice(2);
-    if(c.startsWith("#")) return c;
-    if(c.startsWith("rgb") || c.startsWith("hsl")) return c;
-    // bare hex like d7191c
-    if(/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(c)) return "#"+c;
-    return c;
-  }
   function drawNorthArrow(ctx,x,y,size){
     ctx.save();
     ctx.translate(x,y);
@@ -420,7 +446,7 @@
     const barX=x+pad, barY=y+Math.round(56*S), barW=w-(pad*2), barH=Math.round(16*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
     const stops=Math.max(1,palette.length-1);
-    for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, normColor(palette[i]));
+    for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
     ctx.fillStyle=grad;
     drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(8*S));
     ctx.fill();
@@ -437,61 +463,6 @@
 
     ctx.restore();
   }
-
-  function drawLegendDual(ctx,x,y,w,h,main,diff,S){
-    // One container, two stacked bars (main on top, Δ on bottom)
-    ctx.save();
-    ctx.globalAlpha=.98;
-    ctx.fillStyle="#fff";
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
-    ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.strokeStyle="rgba(0,0,0,0.10)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
-    ctx.stroke();
-
-    const pad = Math.round(14*S);
-    const innerX = x+pad, innerW = w-2*pad;
-    const topH = Math.round((h - 2*pad) * 0.48);
-    const botH = (h - 2*pad) - topH - Math.round(10*S);
-    const topY = y+pad;
-    const botY = topY + topH + Math.round(10*S);
-
-    // helper to draw a bar + min/max
-    function drawOne(blockY, blockH, title, vmin, vmax, unit, palette){
-      ctx.fillStyle="#111";
-      ctx.font="900 "+Math.round(24*S)+"px system-ui, sans-serif";
-      ctx.textAlign="left";
-      ctx.textBaseline="top";
-      ctx.fillText(title, innerX, blockY);
-
-      const barX=innerX, barY=blockY+Math.round(38*S), barW=innerW, barH=Math.round(14*S);
-      const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
-      const pal = (palette && palette.length) ? palette : ["#2166ac","#f7f7f7","#b2182b"];
-      for(let i=0;i<pal.length;i++){
-        const t = pal.length===1 ? 0 : i/(pal.length-1);
-        grad.addColorStop(t, normColor(pal[i]));
-      }
-      ctx.fillStyle=grad;
-      ctx.fillRect(barX,barY,barW,barH);
-
-      ctx.fillStyle="rgba(0,0,0,0.85)";
-      ctx.font="800 "+Math.round(18*S)+"px system-ui, sans-serif";
-      ctx.textBaseline="top";
-      ctx.textAlign="left";
-      if(vmin!==null && vmin!==undefined && vmin!=="") ctx.fillText(String(vmin), barX, barY+barH+Math.round(8*S));
-      ctx.textAlign="right";
-      if(vmax!==null && vmax!==undefined && vmax!=="") ctx.fillText(String(vmax), barX+barW, barY+barH+Math.round(8*S));
-    }
-
-    drawOne(topY, topH, main.title || t("legend"), main.min, main.max, main.unit, main.palette);
-    drawOne(botY, botH, diff.title || "Δ (B−A)", diff.min, diff.max, diff.unit, diff.palette);
-
-
-    ctx.restore();
-  }
-
   function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
@@ -513,8 +484,7 @@
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null,
-    _legendDiff:null
+    dims:null
   };
 
   function loadFromQuery(){
@@ -533,14 +503,6 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        // --- 3-map support (optional) ---
-        if (payload && Array.isArray(payload.maps) && payload.maps.length) {
-          initial._maps = payload.maps.map(function(m){
-            if(!m) return "";
-            return (m.dataUrl || m.url || m.mapUrl || m.map || m.thumbUrl || "");
-          }).filter(Boolean);
-          initial._labels = Array.isArray(payload.labels) ? payload.labels.map(function(x){ return String(x); }) : [];
-        }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -566,22 +528,6 @@
           if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
           initial.unit = payload.meta.unit || "";
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
-        }
-
-        // Optional: secondary legend for Δ (difference)
-        // Expected shape: {min,max,unit,palette,title}
-        const ld = payload.legendDiff || payload.diffLegend || (payload.meta && (payload.meta.legendDiff || payload.meta.diffLegend)) || null;
-        if(ld && (Array.isArray(ld.palette) || typeof ld.palette === "string")){
-          const palArr = Array.isArray(ld.palette) ? ld.palette : String(ld.palette).split(",").map(s=>s.trim()).filter(Boolean);
-          if(palArr.length){
-            initial._legendDiff = {
-              title: ld.title || "Δ (B−A)",
-              min: (ld.min!==undefined && ld.min!==null) ? Number(ld.min) : null,
-              max: (ld.max!==undefined && ld.max!==null) ? Number(ld.max) : null,
-              unit: ld.unit || "",
-              palette: palArr
-            };
-          }
         }
         const f = [
           payload.meta?.island || "",
@@ -765,40 +711,15 @@
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      // load map(s) (try with CORS, fallback without)
-      const multi = (initial && Array.isArray(initial._maps) && initial._maps.length >= 2);
-      // Fallback: if we have at least 1 map in _maps but no single mapUrl, use the first
-      if (initial && Array.isArray(initial._maps) && initial._maps.length >= 1 && !initial.mapUrl) { initial.mapUrl = initial._maps[0]; }
-      let img = null;
-      let imgs = null;
-
-      async function loadOne(u){
-        u = expandThumbUrl(u, 0.10);
-        try{ return await loadImage(u, true); }
-        catch(_e1){
-          try{ return await loadImage(u, false); }
-          catch(_e2){ return null; }
-        }
-      }
-
-      if(multi){
-        imgs = [];
-        for(let i=0;i<initial._maps.length;i++){
-          const u = (initial._maps[i]||"").trim();
-          const im = await loadOne(u);
-          if(!im){ setErr(t("loadFail")); return; }
-          imgs.push(im);
-        }
-      }else{
-        let mapUrl0 = mapUrl;
-        mapUrl0 = expandThumbUrl(mapUrl0, 0.10);
-        try{ img = await loadImage(mapUrl0, true); }
-        catch(_e1){
-          try{ img = await loadImage(mapUrl0, false); }
-          catch(_e2){
-            setErr(t("loadFail"));
-            return;
-          }
+      // load map (try with CORS, fallback without)
+      let img=null;
+      mapUrl = expandThumbUrl(mapUrl, 0.10);
+      try{ img = await loadImage(mapUrl, true); }
+      catch(_e1){
+        try{ img = await loadImage(mapUrl, false); }
+        catch(_e2){
+          setErr(t("loadFail"));
+          return;
         }
       }
 
@@ -851,107 +772,55 @@
     const innerY = mapY + inset;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
+
     // aspect fit map
-    // aspect fit map (single-map) OR compute panel geometry (multi)
-    let drawW = innerW, drawH = innerH, dx = innerX, dy = innerY;
-    let scaleRefDrawW = drawW; // used for scale bar (updated in multi-panel)
-
-    if (!(imgs && imgs.length >= 2)) {
-      // --- single map: fit + slight zoom ---
-      const ar = img.width / img.height;
-      const targetAr = innerW / innerH;
-      if (ar > targetAr) {
-        drawW = innerW;
-        drawH = innerW / ar;
-        dx = innerX;
-        dy = innerY + (innerH - drawH) / 2;
-      } else {
-        drawH = innerH;
-        drawW = innerH * ar;
-        dx = innerX + (innerW - drawW) / 2;
-        dy = innerY;
-      }
-
-      // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
-      const ZOOM = 1.12;
-      const cx = dx + drawW / 2;
-      const cy = dy + drawH / 2;
-      drawW = drawW * ZOOM;
-      drawH = drawH * ZOOM;
-      dx = cx - drawW / 2;
-      dy = cy - drawH / 2;
+    const ar = img.width / img.height;
+    const targetAr = innerW / innerH;
+    let drawW, drawH, dx, dy;
+    if(ar > targetAr){
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
+    } else {
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
     }
+
+    // frame + clip
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
+    ctx.fillStyle = "#cfe8f3";
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.fill();
+
+    ctx.strokeStyle="rgba(0,0,0,0.12)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.stroke();
+
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
+    const cx = dx + drawW/2;
+    const cy = dy + drawH/2;
+    drawW = drawW * ZOOM;
+    drawH = drawH * ZOOM;
+    dx = cx - drawW/2;
+    dy = cy - drawH/2;
 
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
-
-    if (imgs && imgs.length >= 2) {
-      // 3 side-by-side panels, no zoom, no smoothing (avoid fake edge pixels)
-      ctx.imageSmoothingEnabled = false;
-
-      const gap = Math.round(18*S);
-      const multiPad = Math.round(28*S);
-      const innerX = mapX + multiPad;
-      const innerY = mapY + multiPad;
-      const innerW = mapW - 2*multiPad;
-      const innerH = mapH - 2*multiPad;
-
-      const nPanels = imgs.length;
-      const panelW = Math.floor((innerW - (nPanels-1)*gap) / nPanels);
-      const panelH = innerH;
-
-      const labels = (initial && Array.isArray(initial._labels)) ? initial._labels : [];
-      const labelFont = Math.round(28*S);
-      const labelPadX = Math.round(10*S);
-      const labelPadY = Math.round(6*S);
-      const labelR = Math.round(10*S);
-
-      for (let i=0;i<nPanels;i++){
-        const px = innerX + i*(panelW + gap);
-        const py = innerY;
-
-        const im = imgs[i];
-        const iw = im.naturalWidth || im.width;
-        const ih = im.naturalHeight || im.height;
-
-        // contain fit
-        const r = Math.min(panelW/iw, panelH/ih);
-        const dw = iw*r;
-        const dh = ih*r;
-        if(i===0){ scaleRefDrawW = dw; }
-        const dxp = px + (panelW - dw)/2;
-        const dyp = py + (panelH - dh)/2;
-
-        ctx.drawImage(im, dxp, dyp, dw, dh);
-
-        // label (year / Δ) at top center of each panel
-        const lab = labels[i] || "";
-        if(lab){
-          ctx.font = "800 " + labelFont + "px Arial Black, Arial, system-ui, -apple-system, Segoe UI, Roboto";
-          const tw = ctx.measureText(lab).width;
-          const bx = px + (panelW - (tw + 2*labelPadX))/2;
-          const bh = labelFont + 2*labelPadY;
-          const bw = tw + 2*labelPadX;
-          const by = Math.max(py + Math.round(6*S), dyp - (bh + Math.round(4*S)));
-
-          ctx.fillStyle = "rgba(255,255,255,0.80)";
-          drawRoundedRect(ctx, bx, by, bw, bh, labelR);
-          ctx.fill();
-
-          ctx.fillStyle = "rgba(0,0,0,0.80)";
-          ctx.textBaseline = "top";
-          ctx.fillText(lab, bx + labelPadX, by + labelPadY);
-        }
-      }
-    } else {
-      ctx.drawImage(img, dx, dy, drawW, drawH);
-    }
-
+    ctx.drawImage(img, dx, dy, drawW, drawH);
     ctx.restore();
     // overlays
-    const legendSide = ($("legendSide")? $("legendSide").value : "right");
-    const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
+    const legendPos = ($("legendPos")? $("legendPos").value : "br");
+    const legendX = ($("legendX")? Number($("legendX").value||100) : 100);
+    const legendY = ($("legendY")? Number($("legendY").value||100) : 100);
+const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
@@ -965,7 +834,7 @@
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
           // Use the actual drawn map width (drawW) to compute km/px
-          const kmPerPx = bboxWidthKm / Math.max(1, scaleRefDrawW);
+          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
           const targetKm = kmPerPx * scalePx;
           km = niceKm(targetKm);
           // keep the bar visually consistent: adjust pixels to match the chosen nice km
@@ -979,34 +848,38 @@
         }
       }
     if(showLegend){
-      const legW = Math.min(Math.round(560*S), Math.round(mapW * 0.38));
-      const legH = initial._legendDiff ? Math.round(200*S) : Math.round(128*S);
+      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
-      // Base position by side
-      const legX = (legendSide==="left")
-        ? (mapX + legMargin)
-        : (mapX + mapW - legW - legMargin);
+      // Legend position
+      let legX, legY;
+      if(legendPos==="custom"){
+        const availW = Math.max(0, mapW - 2*legMargin - legW);
+        const availH = Math.max(0, mapH - 2*legMargin - legH);
+        legX = mapX + legMargin + Math.round(availW * (legendX/100));
+        legY = mapY + legMargin + Math.round(availH * (legendY/100));
+      }else{
+        const onLeft = (legendPos==="bl" || legendPos==="tl");
+        const onTop  = (legendPos==="tl" || legendPos==="tr");
+        legX = onLeft ? (mapX + legMargin) : (mapX + mapW - legW - legMargin);
+        legY = onTop ? (mapY + legMargin) : (mapY + mapH - legH - legMargin);
 
-      // If scale is on and same side, stack legend above the scale bar
-      let legY = mapY + mapH - legH - legMargin;
-      if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-        const gap = Math.round(14*S);
-        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+        // If scale is on and legend is bottom and on same side, stack legend above the scale bar
+        if(!onTop && showScale){
+          const sameSide = ( (onLeft && scaleSide==="left") || (!onLeft && scaleSide==="right") );
+          if(sameSide){
+            const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+            const gap = Math.round(14*S);
+            legY = legY - scaleStackH - gap;
+          }
+        }
       }
-      // Safety clamp (avoid going above the map)
-      legY = Math.max(mapY + legMargin, legY);
-
-      if(initial._legendDiff){
-        drawLegendDual(ctx, legX, legY, legW, legH,
-          {title: t("legend"), min:vmin, max:vmax, unit:unit, palette:palette},
-          initial._legendDiff,
-          S);
-      } else {
-        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
-      }
-}
+      // Safety clamp (keep inside the map)
+      legX = Math.min(Math.max(mapX + legMargin, legX), mapX + mapW - legW - legMargin);
+      legY = Math.min(Math.max(mapY + legMargin, legY), mapY + mapH - legH - legMargin);
+drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+    }
 
     if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
@@ -1049,13 +922,31 @@
   $("btnDownload").addEventListener("click", download);
   $("btnReset").addEventListener("click", () => {
     loadFromQuery();
+    syncLegendCustomUI();
     setErr("");
     setStatus("");
   });
 
-  // init
+  
+  // legend position (custom)
+  function syncLegendCustomUI(){
+    const pos = $("legendPos") ? $("legendPos").value : "br";
+    const wrap = $("legendCustomWrap");
+    if(wrap) wrap.style.display = (pos==="custom") ? "block" : "none";
+    const x = $("legendX") ? Number($("legendX").value||0) : 0;
+    const y = $("legendY") ? Number($("legendY").value||0) : 0;
+    if($("legendXVal")) $("legendXVal").textContent = String(x);
+    if($("legendYVal")) $("legendYVal").textContent = String(y);
+  }
+  if($("legendPos")){
+    $("legendPos").addEventListener("change", () => { syncLegendCustomUI(); });
+  }
+  if($("legendX")) $("legendX").addEventListener("input", syncLegendCustomUI);
+  if($("legendY")) $("legendY").addEventListener("input", syncLegendCustomUI);
+// init
   applyLang();
   loadFromQuery();
+  syncLegendCustomUI();
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
 </script>
