@@ -147,7 +147,7 @@
             <select id="legendSide">
               <option value="right" selected>Dreta</option>
               <option value="left">Esquerra</option>
-            <option value="manual">Manual</option>
+              <option value="free">Lliure</option>
             </select>
           </div>
           <div style="flex:1">
@@ -211,7 +211,12 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const qs = (k) => new URLSearchParams(location.search).get(k);
+  
+
+// --- Free legend positioning (minimal add-on) ---
+let LEGEND_FREE = { enabled:false, x:null, y:null, w:0, h:0, active:false, offX:0, offY:0 };
+let LEGEND_BOXES = []; // populated on each render: {x,y,w,h}
+const qs = (k) => new URLSearchParams(location.search).get(k);
 
   // ---------- i18n ----------
   const I18N = {
@@ -228,7 +233,7 @@
       missingMap:"Falta l'URL del mapa (PNG).",
       loadFail:"No s'ha pogut carregar el PNG del mapa.\n\n• Revisa que l'URL sigui correcte i no hagi expirat.\n• Pot ser CORS o permissos.\n\nProva d'obrir l'URL en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.",
       dlFail:"No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n",
-      left:"Esquerra", right:"Dreta", manual:"Manual",
+      left:"Esquerra", right:"Dreta", free:"Lliure",
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
@@ -243,7 +248,7 @@
       missingMap:"Falta la URL del mapa (PNG).",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
-      left:"Izquierda", right:"Derecha", manual:"Manual",
+      left:"Izquierda", right:"Derecha", free:"Libre",
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
@@ -258,23 +263,12 @@
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
-      left:"Left", right:"Right", manual:"Manual",
+      left:"Left", right:"Right", free:"Free",
     }
   };
   let LANG = qs("lang") || "ca";
   if(!I18N[LANG]) LANG = "ca";
   const t = (k) => I18N[LANG][k] || I18N.ca[k] || k;
-
-  // ---------- Legend drag (manual positioning) ----------
-  let legendFx = 0.82; // 0..1 within allowed X range
-  let legendFy = 0.80; // 0..1 within allowed Y range
-  let legendDragging = false;
-  let legendDragOffX = 0;
-  let legendDragOffY = 0;
-  let lastLegendRect = null; // {x,y,w,h, allowed:{xmin,xmax,ymin,ymax}}
-  let lastCanvasWH = {W:0,H:0};
-  const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
 
   function applyLang() {
     $("btnReset").textContent = t("reset");
@@ -294,15 +288,15 @@
         legSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-          if(o.value==="manual") o.textContent = t("manual");
-        });
+                  if(o.value==="free") o.textContent = t("free");
+});
       }
       if(scSel){
         scSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-          if(o.value==="manual") o.textContent = t("manual");
-        });
+                  if(o.value==="free") o.textContent = t("free");
+});
       }
     };
     setSideOptionLabels();
@@ -544,68 +538,8 @@
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
 
-  // Pointer-based legend dragging (only active when Legend position = Manual)
-  const canvasToPosterXY = (ev) => {
-    const r = canvas.getBoundingClientRect();
-    const x = (ev.clientX - r.left) * (lastCanvasWH.W / r.width);
-    const y = (ev.clientY - r.top)  * (lastCanvasWH.H / r.height);
-    return {x,y};
-  };
-
-  const isLegendManual = () => ($("legendSide") && $("legendSide").value === "manual");
-
-  const onPointerDown = (ev) => {
-    if(!isLegendManual() || !lastLegendRect) return;
-    const {x,y} = canvasToPosterXY(ev);
-    const r = lastLegendRect;
-    if(x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h){
-      legendDragging = true;
-      legendDragOffX = x - r.x;
-      legendDragOffY = y - r.y;
-      canvas.setPointerCapture(ev.pointerId);
-      ev.preventDefault();
-    }
-  };
-
-  const onPointerMove = (ev) => {
-    if(!legendDragging || !isLegendManual() || !lastLegendRect) return;
-    const {x,y} = canvasToPosterXY(ev);
-    const r = lastLegendRect;
-    const a = r.allowed;
-
-    // Desired top-left
-    let nx = x - legendDragOffX;
-    let ny = y - legendDragOffY;
-
-    // Clamp inside allowed bounds
-    nx = Math.max(a.xmin, Math.min(a.xmax, nx));
-    ny = Math.max(a.ymin, Math.min(a.ymax, ny));
-
-    // Update normalized fractions
-    const dx = (a.xmax - a.xmin) || 1;
-    const dy = (a.ymax - a.ymin) || 1;
-    legendFx = clamp01((nx - a.xmin) / dx);
-    legendFy = clamp01((ny - a.ymin) / dy);
-
-    // Re-render (fast path: same map URLs, just redraw)
-    render();
-  };
-
-  const onPointerUp = (ev) => {
-    if(!legendDragging) return;
-    legendDragging = false;
-    try{ canvas.releasePointerCapture(ev.pointerId); }catch(e){}
-  };
-
-  canvas.addEventListener("pointerdown", onPointerDown);
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerup", onPointerUp);
-  canvas.addEventListener("pointercancel", onPointerUp);
-
-
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
-    lastCanvasWH = {W: outW, H: outH};
     canvas.width=outW*dpr;
     canvas.height=outH*dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -705,7 +639,8 @@
 
   async function render(){
     setErr("");
-    $("btnRender").disabled=true;
+    LEGEND_BOXES = [];
+$("btnRender").disabled=true;
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
@@ -881,54 +816,45 @@
           drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
         }
       }
-    
     if(showLegend){
       const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
       const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
-      // Allowed box inside the map frame
-      const allowed = {
-        xmin: mapX + legMargin,
-        xmax: mapX + mapW - legW - legMargin,
-        ymin: mapY + legMargin,
-        ymax: mapY + mapH - legH - legMargin
-      };
-
-      let legX, legY;
-
-      if(legendSide === "manual"){
-        // Manual position (drag). Fractions are relative to allowed box.
-        const dx = (allowed.xmax - allowed.xmin) || 1;
-        const dy = (allowed.ymax - allowed.ymin) || 1;
-        legX = allowed.xmin + legendFx * dx;
-        legY = allowed.ymin + legendFy * dy;
-      }else{
-        // Base position by side
-        legX = (legendSide==="left")
-          ? (mapX + legMargin)
-          : (mapX + mapW - legW - legMargin);
-
-        // If scale is on and same side, stack legend above the scale bar
-        legY = mapY + mapH - legH - legMargin;
-        if(showScale && legendSide === scaleSide){
-          const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-          const gap = Math.round(14*S);
-          legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
-        }
-        // Safety clamp (avoid going above the map)
-        legY = Math.max(mapY + legMargin, legY);
-      }
-
-      // Final clamp inside allowed box (guards negative ranges)
-      legX = Math.max(allowed.xmin, Math.min(allowed.xmax, legX));
-      legY = Math.max(allowed.ymin, Math.min(allowed.ymax, legY));
-
-      // Save rect for hit-testing during drag
-      lastLegendRect = {x: legX, y: legY, w: legW, h: legH, allowed};
-
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      
+  // Base position by side (or free)
+  let legX, legY;
+  if(legendSide==="free"){
+    // Init default free position (bottom-right)
+    if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
+      LEGEND_FREE.x = mapX + mapW - legW - legMargin;
+      LEGEND_FREE.y = mapY + mapH - legH - legMargin;
     }
+    legX = LEGEND_FREE.x;
+    legY = LEGEND_FREE.y;
+  } else {
+    legX = (legendSide==="left")
+      ? (mapX + legMargin)
+      : (mapX + mapW - legW - legMargin);
+
+    // If scale is on and same side, stack legend above the scale bar
+    legY = mapY + mapH - legH - legMargin;
+    if(showScale && legendSide === scaleSide){
+      const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+      const gap = Math.round(14*S);
+      legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+    }
+  }
+
+  // Safety clamp (keep inside map)
+  legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
+  legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - legH - legMargin);
+
+  // Register for drag hit-testing (only used when legendSide==="free")
+  LEGEND_BOXES.push({x:legX,y:legY,w:legW,h:legH});
+
+  drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+}
 
     if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
@@ -965,6 +891,66 @@
       setErr(t("dlFail") + e);
     }
   }
+
+
+// --- free legend drag (only active when Posició llegenda = Lliure) ---
+(function(){
+  const canvasEl = $("c");
+  if(!canvasEl) return;
+
+  const getXY = (ev) => {
+    const r = canvasEl.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * (canvasEl.width / r.width);
+    const y = (ev.clientY - r.top)  * (canvasEl.height / r.height);
+    return {x,y};
+  };
+
+  const hitLegend = (x,y) => {
+    for(let i=LEGEND_BOXES.length-1;i>=0;i--){
+      const b = LEGEND_BOXES[i];
+      if(x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h) return b;
+    }
+    return null;
+  };
+
+  canvasEl.addEventListener("mousedown", (ev) => {
+    const legendSide = ($("legendSide")? $("legendSide").value : "right");
+    if(legendSide!=="free") return;
+    const {x,y} = getXY(ev);
+    const b = hitLegend(x,y);
+    if(!b) return;
+    LEGEND_FREE.active = true;
+    LEGEND_FREE.offX = x - b.x;
+    LEGEND_FREE.offY = y - b.y;
+    ev.preventDefault();
+  });
+
+  window.addEventListener("mousemove", (ev) => {
+    if(!LEGEND_FREE.active) return;
+    const legendSide = ($("legendSide")? $("legendSide").value : "right");
+    if(legendSide!=="free") { LEGEND_FREE.active=false; return; }
+    const {x,y} = getXY(ev);
+    LEGEND_FREE.x = x - LEGEND_FREE.offX;
+    LEGEND_FREE.y = y - LEGEND_FREE.offY;
+    render();
+  });
+
+  window.addEventListener("mouseup", () => { LEGEND_FREE.active = false; });
+  canvasEl.addEventListener("mouseleave", () => { LEGEND_FREE.active = false; });
+
+  // reset stored free pos when user switches away from free
+  const sel = $("legendSide");
+  if(sel){
+    sel.addEventListener("change", () => {
+      if(sel.value!=="free"){
+        LEGEND_FREE.x = null;
+        LEGEND_FREE.y = null;
+        LEGEND_FREE.active = false;
+      }
+      if(($("mapUrl").value||"").trim()) render();
+    });
+  }
+})();
 
   // wire
   $("btnRender").addEventListener("click", render);
