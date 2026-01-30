@@ -154,6 +154,7 @@
             <select id="scaleSide">
               <option value="left" selected>Esquerra</option>
               <option value="right">Dreta</option>
+              <option value="free">Lliure</option>
             </select>
           </div>
         </div>
@@ -227,7 +228,7 @@
       missingMap:"Falta l'URL del mapa (PNG).",
       loadFail:"No s'ha pogut carregar el PNG del mapa.\n\n• Revisa que l'URL sigui correcte i no hagi expirat.\n• Pot ser CORS o permissos.\n\nProva d'obrir l'URL en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.",
       dlFail:"No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n",
-      left:"Esquerra", right:"Dreta",
+      left:"Esquerra", right:"Dreta", free:"Lliure",
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
@@ -242,7 +243,7 @@
       missingMap:"Falta la URL del mapa (PNG).",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
-      left:"Izquierda", right:"Derecha",
+      left:"Izquierda", right:"Derecha", free:"Libre",
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
@@ -257,7 +258,7 @@
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
-      left:"Left", right:"Right",
+      left:"Left", right:"Right", free:"Free",
     }
   };
   let LANG = qs("lang") || "ca";
@@ -282,13 +283,15 @@
         legSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-        });
+                  if(o.value==="free") o.textContent = t("free");
+});
       }
       if(scSel){
         scSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-        });
+                  if(o.value==="free") o.textContent = t("free");
+});
       }
     };
     setSideOptionLabels();
@@ -447,9 +450,10 @@
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
     dims:null,
-    maps:null,
-    labels:null,
-    legendDiff:null
+    maps:null,          // optional: [{dataUrl:...}, ...] or [url,...]
+    labels:null,        // optional: [label1,label2,label3]
+    legendMain:null,    // optional: {min,max,unit,palette}
+    legendDiff:null     // optional: {min,max,unit,palette}
   };
 
   function loadFromQuery(){
@@ -468,13 +472,20 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        // Multi-map support (from visor): payload.maps = [url1,url2,url3]
-        if(payload && Array.isArray(payload.maps) && payload.maps.length){
-          initial.maps = payload.maps.slice(0);
-        }
-        if(payload && payload.labels){ initial.labels = payload.labels; }
-        if(payload && payload.legendDiff){ initial.legendDiff = payload.legendDiff; }
 
+// Support 3-map compositions from the visor (payload.maps + payload.labels)
+if(Array.isArray(payload.maps) && payload.maps.length){
+  initial.maps = payload.maps;
+}
+if(Array.isArray(payload.labels) && payload.labels.length){
+  initial.labels = payload.labels;
+}
+if(payload.legendMain){
+  initial.legendMain = payload.legendMain;
+}
+if(payload.legendDiff){
+  initial.legendDiff = payload.legendDiff;
+}
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -525,6 +536,26 @@
     setIf("mapUrl", initial.mapUrl);
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
+
+// If the visor provided multi-map payload, keep it in memory for render()
+if(initial.maps && Array.isArray(initial.maps) && initial.maps.length){
+  PAYLOAD_MAPS = initial.maps.map(m => (m && typeof m === "object") ? (m.dataUrl || m.url || m.mapUrl || "") : String(m));
+  PAYLOAD_MAPS = PAYLOAD_MAPS.filter(u => !!u);
+}
+if(initial.labels && Array.isArray(initial.labels) && initial.labels.length){
+  PAYLOAD_LABELS = initial.labels.map(x => String(x));
+}
+if(initial.legendMain){
+  // Override hidden legend inputs with main legend (if provided)
+  if(isFinite(initial.legendMain.min)) initial.vmin = String(initial.legendMain.min);
+  if(isFinite(initial.legendMain.max)) initial.vmax = String(initial.legendMain.max);
+  if(initial.legendMain.unit != null) initial.unit = String(initial.legendMain.unit);
+  if(initial.legendMain.palette != null) initial.palette = String(initial.legendMain.palette);
+}
+if(initial.legendDiff){
+  PAYLOAD_LEGEND_DIFF = initial.legendDiff;
+}
+
     setIf("vmin", initial.vmin);
     setIf("vmax", initial.vmax);
     setIf("unit", initial.unit);
@@ -540,6 +571,15 @@
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
 
+
+// ---- payload-driven multi-map support (kept minimal) ----
+let PAYLOAD_MAPS = null;   // array of urls (len 3) or null
+let PAYLOAD_LABELS = null; // array of labels (len 3) or null
+let PAYLOAD_LEGEND_DIFF = null; // {min,max,unit,palette} or null
+
+// ---- free legend drag state (only active when legendSide == "free") ----
+let LEGEND_FREE = {x:null, y:null, active:false, offX:0, offY:0};
+let LEGEND_BOX = null; // {x,y,w,h}
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
     canvas.width=outW*dpr;
@@ -683,19 +723,34 @@
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      // load map (try with CORS, fallback without)
-      let img=null;
-      mapUrl = expandThumbUrl(mapUrl, 0.10);
-      try{ img = await loadImage(mapUrl, true); }
-      catch(_e1){
-        try{ img = await loadImage(mapUrl, false); }
-        catch(_e2){
-          setErr(t("loadFail"));
-          return;
-        }
-      }
+      
+// load map(s) (try with CORS, fallback without)
+let imgs = [];
+let urls = null;
 
-    const W=outW, H=outH;
+if(Array.isArray(PAYLOAD_MAPS) && PAYLOAD_MAPS.length === 3){
+  urls = PAYLOAD_MAPS.slice();
+} else {
+  urls = [mapUrl];
+}
+
+try{
+  for(let i=0;i<urls.length;i++){
+    let u = expandThumbUrl(String(urls[i]||""), 0.10);
+    let im=null;
+    try{ im = await loadImage(u, true); }
+    catch(_e1){ im = await loadImage(u, false); }
+    imgs.push(im);
+  }
+}catch(_e){
+  setErr(t("loadFail"));
+  return;
+}
+
+// keep backward-compat variable name for existing code paths
+let img = imgs[0];
+
+const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
@@ -745,37 +800,38 @@
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // aspect fit map
-    const ar = img.width / img.height;
-    const targetAr = innerW / innerH;
+    
+// frame + content
+ctx.save();
+drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+ctx.clip();
+
+if(imgs.length === 3){
+  const colGap = Math.round(14*S);
+  const colW = (innerW - colGap*2) / 3;
+  for(let i=0;i<3;i++){
+    const im = imgs[i];
+    const colX = innerX + i*(colW + colGap);
+    const colY = innerY;
+    const colH = innerH;
+
+    // aspect fit per column
+    const ar = im.width / im.height;
+    const targetAr = colW / colH;
     let drawW, drawH, dx, dy;
     if(ar > targetAr){
-      drawW = innerW;
-      drawH = innerW / ar;
-      dx = innerX;
-      dy = innerY + (innerH - drawH)/2;
+      drawW = colW;
+      drawH = colW / ar;
+      dx = colX;
+      dy = colY + (colH - drawH)/2;
     } else {
-      drawH = innerH;
-      drawW = innerH * ar;
-      dx = innerX + (innerW - drawW)/2;
-      dy = innerY;
+      drawH = colH;
+      drawW = colH * ar;
+      dx = colX + (colW - drawW)/2;
+      dy = colY;
     }
 
-    // frame + clip
-
-    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
-    // keep a subtle rounded frame + border only
-    ctx.fillStyle = "#cfe8f3";
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.fill();
-
-    ctx.strokeStyle="rgba(0,0,0,0.12)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.stroke();
-
-    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
-    const ZOOM = 1.12;
+    // apply zoom about center
     const cx = dx + drawW/2;
     const cy = dy + drawH/2;
     drawW = drawW * ZOOM;
@@ -783,11 +839,49 @@
     dx = cx - drawW/2;
     dy = cy - drawH/2;
 
-    ctx.save();
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
-    ctx.drawImage(img, dx, dy, drawW, drawH);
-    ctx.restore();
+    ctx.drawImage(im, dx, dy, drawW, drawH);
+
+    // optional per-panel label (if provided)
+    if(PAYLOAD_LABELS && PAYLOAD_LABELS[i] != null){
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      const bh = Math.round(44*S);
+      ctx.fillRect(colX + Math.round(12*S), colY + Math.round(12*S), Math.round(colW - 24*S), bh);
+      ctx.fillStyle = "#111";
+      ctx.font = "700 " + Math.round(26*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(String(PAYLOAD_LABELS[i]), colX + Math.round(24*S), colY + Math.round(12*S) + bh/2);
+      ctx.restore();
+    }
+  }
+} else {
+  // aspect fit single map
+  const ar = img.width / img.height;
+  const targetAr = innerW / innerH;
+  let drawW, drawH, dx, dy;
+  if(ar > targetAr){
+    drawW = innerW;
+    drawH = innerW / ar;
+    dx = innerX;
+    dy = innerY + (innerH - drawH)/2;
+  } else {
+    drawH = innerH;
+    drawW = innerH * ar;
+    dx = innerX + (innerW - drawW)/2;
+    dy = innerY;
+  }
+
+  // zoom
+  const cx = dx + drawW/2;
+  const cy = dy + drawH/2;
+  drawW = drawW * ZOOM;
+  drawH = drawH * ZOOM;
+  dx = cx - drawW/2;
+  dy = cy - drawH/2;
+
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+}ctx.restore();
     // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
@@ -817,28 +911,65 @@
           drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
         }
       }
-    if(showLegend){
-      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(140*S);
-      const legMargin = Math.round(26*S);
+    
+if(showLegend){
+  const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+  const legH = Math.round(140*S);
+  const legMargin = Math.round(26*S);
+  const gap = Math.round(14*S);
 
-      // Base position by side
-      const legX = (legendSide==="left")
-        ? (mapX + legMargin)
-        : (mapX + mapW - legW - legMargin);
+  const hasDiffLegend = !!(PAYLOAD_LEGEND_DIFF && isFinite(PAYLOAD_LEGEND_DIFF.min) && isFinite(PAYLOAD_LEGEND_DIFF.max) && PAYLOAD_LEGEND_DIFF.palette);
+  const totalH = hasDiffLegend ? (legH*2 + gap) : legH;
 
-      // If scale is on and same side, stack legend above the scale bar
-      let legY = mapY + mapH - legH - legMargin;
-      if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-        const gap = Math.round(14*S);
-        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
-      }
-      // Safety clamp (avoid going above the map)
-      legY = Math.max(mapY + legMargin, legY);
+  let legX, legY;
 
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+  if(legendSide === "free"){
+    // Init default free position (bottom-right)
+    if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
+      LEGEND_FREE.x = mapX + mapW - legW - legMargin;
+      LEGEND_FREE.y = mapY + mapH - totalH - legMargin;
     }
+    legX = LEGEND_FREE.x;
+    legY = LEGEND_FREE.y;
+  } else {
+    legX = (legendSide==="left")
+      ? (mapX + legMargin)
+      : (mapX + mapW - legW - legMargin);
+
+    // If scale is on and same side, stack legend above the scale bar
+    legY = mapY + mapH - totalH - legMargin;
+    if(showScale && legendSide === scaleSide){
+      const scaleStackH = Math.round(54*S); // approx footprint of scale + label
+      legY = legY - scaleStackH - gap;
+    }
+  }
+
+  // Clamp to map bounds
+  legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
+  legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - totalH - legMargin);
+
+  // Register box for dragging (legend block: main + diff)
+  LEGEND_BOX = {x: legX, y: legY, w: legW, h: totalH};
+
+  // Main legend from hidden fields
+  drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+
+  // Diff legend (if provided by visor)
+  if(hasDiffLegend){
+    drawLegend(
+      ctx,
+      legX,
+      legY + legH + gap,
+      legW,
+      legH,
+      String(PAYLOAD_LEGEND_DIFF.min),
+      String(PAYLOAD_LEGEND_DIFF.max),
+      String(PAYLOAD_LEGEND_DIFF.unit || "Δ (B−A)"),
+      String(PAYLOAD_LEGEND_DIFF.palette),
+      S
+    );
+  }
+}
 
     if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
@@ -876,387 +1007,57 @@
     }
   }
 
-  // wire
 
-  // ---------- minimal patch: support 3 maps + draggable legend ----------
-  const __state = {
-    imgs: null,          // [Image,...]
-    mapUrls: null,       // [string,...]
-    labels: null,        // {a,b,diff} or array
-    legendDiff: null,    // {vmin,vmax,unit,palette}
-    legendBox: null,     // {x,y,w,h}
-    dragging: false,
-    dragDX: 0,
-    dragDY: 0,
-    lastDrawParams: null // store latest params for redraw without reloading
+// --- enable legend drag when legend position is 'free' ---
+(function(){
+  if(!canvas) return;
+
+  const toCanvasXY = (ev) => {
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * (canvas.width / (window.devicePixelRatio||1)) / r.width;
+    const y = (ev.clientY - r.top)  * (canvas.height / (window.devicePixelRatio||1)) / r.height;
+    return {x,y};
   };
 
-  function getMultiFromInitialOrForm(){
-    // If opened from visor, initial.maps will exist.
-    if(Array.isArray(initial.maps) && initial.maps.length){
-      const urls = initial.maps.slice(0,3).filter(Boolean);
-      if(urls.length) return urls;
-    }
-    // fallback: single map from form
-    const one = ($("mapUrl").value||"").trim();
-    return one ? [one] : [];
-  }
+  const isFree = () => $("legendSide") && $("legendSide").value === "free";
 
-  function normLabels(lbl){
-    // Accept {map1,map2,map3} or {a,b,diff} or array of 3 strings
-    if(!lbl) return {a:"Mapa 1", b:"Mapa 2", c:"Mapa 3"};
-    if(Array.isArray(lbl)){
-      return {a:String(lbl[0]||"Mapa 1"), b:String(lbl[1]||"Mapa 2"), c:String(lbl[2]||"Mapa 3")};
-    }
-    const a = lbl.a || lbl.map1 || lbl.label1 || "Mapa 1";
-    const b = lbl.b || lbl.map2 || lbl.label2 || "Mapa 2";
-    const c = lbl.c || lbl.diff || lbl.map3 || lbl.label3 || "Mapa 3";
-    return {a:String(a), b:String(b), c:String(c)};
-  }
-
-  function normLegendDiff(ld){
-    if(!ld) return null;
-    const vmin = (ld.vmin!=null? String(ld.vmin):"");
-    const vmax = (ld.vmax!=null? String(ld.vmax):"");
-    const unit = (ld.unit!=null? String(ld.unit):"Δ (B−A)");
-    const palette = Array.isArray(ld.palette) ? ld.palette : (typeof ld.palette==="string" ? parsePalette(ld.palette) : []);
-    return {vmin, vmax, unit, palette: palette.length? palette : ["#2c7bb6","#ffffbf","#d7191c"]};
-  }
-
-  async function loadImagesForUrls(urls){
-    const out=[];
-    for(const u0 of urls){
-      const u = expandThumbUrl(u0, 0.10);
-      try{ out.push(await loadImage(u,true)); }
-      catch(_e1){
-        out.push(await loadImage(u,false));
-      }
-    }
-    return out;
-  }
-
-  function computeLegendDefaultXY(W,H,pad,S,legendW,legendH){
-    const legendSide = ($("legendSide")? $("legendSide").value : "right");
-    const x = (legendSide==="left") ? (pad) : (W - pad - legendW);
-    const y = (H - pad - legendH);
-    return {x,y};
-  }
-
-  function drawAll(params){
-    const {
-      outW:W,outH:H,S,pad,
-      title,subtitle,
-      vmin,vmax,unit,palette,
-      scaleKm,scalePx,footer,
-      showLegend,showNorth,showScale,showFooter,
-      imgs,labels,legendDiff
-    } = params;
-
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
-
-    // header
-    const headerH = Math.round(260*S);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
-    ctx.strokeStyle="rgba(0,0,0,0.06)";
-    ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
-
-    const logoH = Math.round(120*S);
-    const brandImg = $("logoBrand");
-    const yLogo = Math.round(70*S);
-    const brandW = Math.round((brandImg.naturalWidth / brandImg.naturalHeight) * logoH);
-    ctx.drawImage(brandImg, pad, yLogo, brandW, logoH);
-
-    const titleX = pad;
-    const titleY = yLogo + logoH + Math.round(42*S);
-    ctx.textAlign="left"; ctx.textBaseline="top";
-    ctx.fillStyle="#111";
-    ctx.font="900 "+Math.round(60*S)+"px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-    ctx.fillText(title || "", titleX, titleY);
-
-    let afterHeaderTextY = titleY + Math.round(64*S);
-    if(subtitle){
-      ctx.fillStyle="#374151";
-      ctx.font="500 "+Math.round(32*S)+"px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-      const lines = subtitle.split("\n").slice(0,3);
-      for(let i=0;i<lines.length;i++){
-        ctx.fillText(lines[i], titleX, titleY + Math.round(66*S) + i*Math.round(36*S));
-      }
-      afterHeaderTextY = titleY + Math.round(66*S) + lines.length*Math.round(36*S);
-    }
-
-    const mapTop = Math.max(headerH, Math.round(afterHeaderTextY + 34*S));
-    const mapX = pad;
-    const mapY = mapTop;
-    const mapW = W - pad*2;
-    const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
-
-    // frame
-    ctx.fillStyle="#cfe8f3";
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.fill();
-
-    // inner
-    const inset = Math.round(18*S);
-    const innerX = mapX + inset;
-    const innerY = mapY + inset;
-    const innerW = mapW - inset*2;
-    const innerH = mapH - inset*2;
-
-    // draw maps
-    const n = imgs.length;
-    const gap = Math.round(18*S);
-    const slotW = (n===1) ? innerW : Math.floor((innerW - gap*(n-1)) / n);
-    const slotH = innerH;
-
-    // labels above each slot (inside map frame)
-    const labelPadY = Math.round(8*S);
-    const labelH = Math.round(34*S);
-    ctx.font="900 "+Math.round(22*S)+"px system-ui, sans-serif";
-    ctx.textAlign="left"; ctx.textBaseline="top";
-
-    for(let i=0;i<n;i++){
-      const img=imgs[i];
-      const sx = innerX + i*(slotW+gap);
-      const sy = innerY;
-      const sw = slotW;
-      const sh = slotH;
-
-      // clip to rounded rect per slot
-      ctx.save();
-      drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-      ctx.clip();
-
-      // fit
-      const ar = img.width / img.height;
-      const targetAr = sw / sh;
-      let drawW, drawH, dx, dy;
-      if(ar > targetAr){
-        drawW = sw;
-        drawH = sw / ar;
-        dx = sx;
-        dy = sy + (sh - drawH)/2;
-      } else {
-        drawH = sh;
-        drawW = sh * ar;
-        dx = sx + (sw - drawW)/2;
-        dy = sy;
-      }
-      ctx.drawImage(img, dx, dy, drawW, drawH);
-      ctx.restore();
-
-      // slot border
-      ctx.strokeStyle="rgba(0,0,0,0.12)";
-      ctx.lineWidth=Math.max(1,Math.round(2*S));
-      drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-      ctx.stroke();
-
-      // label text (top-left in each slot)
-      const lab = (n===1) ? "" : (i===0?labels.a:(i===1?labels.b:labels.c));
-      if(lab){
-        const lx=sx+Math.round(14*S), ly=sy+Math.round(12*S);
-        ctx.fillStyle="rgba(255,255,255,0.82)";
-        drawRoundedRect(ctx, lx- Math.round(10*S), ly- Math.round(6*S), ctx.measureText(lab).width + Math.round(26*S), labelH, Math.round(12*S));
-        ctx.fill();
-        ctx.fillStyle="#111";
-        ctx.fillText(lab, lx, ly);
-      }
-    }
-
-    // Legend + optional diff legend (draggable group)
-    let legendW = Math.round(360*S);
-    let legendH = Math.round(120*S);
-    let legendTotalH = legendH;
-    const hasDiffLegend = !!(legendDiff && n===3);
-    const diffH = hasDiffLegend ? Math.round(120*S) : 0;
-    const legendGapY = hasDiffLegend ? Math.round(14*S) : 0;
-    legendTotalH = legendH + diffH + legendGapY;
-
-    if(showLegend){
-      // default legend box on first render
-      if(!__state.legendBox || !__state.dragging){
-        if(!__state.legendBox){
-          const xy = computeLegendDefaultXY(W,H,pad,S,legendW,legendTotalH);
-          __state.legendBox = {x:xy.x,y:xy.y,w:legendW,h:legendTotalH};
-        } else {
-          // keep x/y, update w/h
-          __state.legendBox.w = legendW;
-          __state.legendBox.h = legendTotalH;
-        }
-      }
-
-      const bx = __state.legendBox.x;
-      const by = __state.legendBox.y;
-
-      drawLegend(ctx,bx,by,legendW,legendH,vmin,vmax,unit,palette,S);
-
-      if(hasDiffLegend){
-        const dy = by + legendH + legendGapY;
-        drawLegend(ctx,bx,dy,legendW,diffH,legendDiff.vmin,legendDiff.vmax,legendDiff.unit,legendDiff.palette,S);
-      }
-    } else {
-      __state.legendBox = null;
-    }
-
-    // North arrow + scale bar keep existing side logic
-    const northSide = ($("northSide")? $("northSide").value : "right");
-    const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
-
-    let scaleY = H - pad - Math.round(40*S);
-    if(showFooter) scaleY -= Math.round(60*S);
-
-    // If legend and scale on same side, keep scale below legend (but do not move legend)
-    if(showLegend && showScale && __state.legendBox){
-      if(scaleSide === ($("legendSide")? $("legendSide").value : "right")){
-        scaleY = Math.max(scaleY, __state.legendBox.y + __state.legendBox.h + Math.round(20*S));
-      }
-    }
-
-    if(showScale){
-      const sx = (scaleSide==="left") ? pad : (W - pad - scalePx);
-      drawScaleBar(ctx, sx, scaleY, scalePx, (scaleKm||"") + (scaleKm? " km":""), S);
-    }
-    if(showNorth){
-      const nx = (northSide==="left") ? (pad + Math.round(40*S)) : (W - pad - Math.round(40*S));
-      const ny = mapY + Math.round(60*S);
-      drawNorthArrow(ctx, nx, ny, Math.round(26*S));
-    }
-
-    if(showFooter && footer){
-      ctx.fillStyle="#6b7280";
-      ctx.font="700 "+Math.round(20*S)+"px system-ui, sans-serif";
-      ctx.textAlign="left"; ctx.textBaseline="bottom";
-      ctx.fillText(footer, pad, H - Math.round(30*S));
-    }
-  }
-
-  async function renderNew(){
-    setErr("");
-    $("btnRender").disabled=true;
-    setStatus('<span class="spin"></span>'+t("generating"));
-
-    try{
-      const urls = getMultiFromInitialOrForm();
-      if(!urls.length){ setErr(t("missingMap")); return; }
-
-      const posterW = parseInt($("posterW").value,10) || 3200;
-      let S = posterW / 2400;
-      S = Math.max(1.0, Math.min(2.0, S));
-
-      let pad = parseInt($("padPx").value,10) || 60;
-      pad = Math.round(pad * S);
-
-      const title = ($("title").value||"").trim() || "Pòster";
-      const subtitle = ($("subtitle").value||"").trim();
-      const vmin = (($("vmin") && $("vmin").value) || "").trim();
-      const vmax = (($("vmax") && $("vmax").value) || "").trim();
-      const unit = ($("unit").value||"").trim();
-      const palette = parsePalette(($("palette").value||"").trim());
-      const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
-      let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
-      if(!isFinite(scalePx) || scalePx<=0) scalePx=180;
-      scalePx = Math.round(scalePx * S);
-
-      const footer = (($("footer") && $("footer").value) || "").trim();
-
-      const showLegend = $("showLegend").checked;
-      const showNorth  = $("showNorth").checked;
-      const showScale  = $("showScale").checked;
-      const showFooter = $("showFooter").checked;
-
-      const outW = posterW;
-      const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
-      const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
-      const outH = Math.round(outW * ratio);
-      setCanvasSize(outW,outH);
-
-      // load images only if urls changed
-      const same = __state.mapUrls && __state.mapUrls.length===urls.length && __state.mapUrls.every((u,i)=>u===urls[i]);
-      if(!same){
-        const imgs = await loadImagesForUrls(urls);
-        __state.imgs = imgs;
-        __state.mapUrls = urls;
-        __state.legendBox = null; // reset default position when the content changes
-      }
-
-      __state.labels = normLabels(initial.labels);
-      __state.legendDiff = normLegendDiff(initial.legendDiff);
-
-      __state.lastDrawParams = {
-        outW,outH,S,pad,
-        title,subtitle,
-        vmin,vmax,unit,palette,
-        scaleKm,scalePx,footer,
-        showLegend,showNorth,showScale,showFooter,
-        imgs: __state.imgs,
-        labels: __state.labels,
-        legendDiff: __state.legendDiff
-      };
-
-      drawAll(__state.lastDrawParams);
-
-    } catch(e){
-      console.error(e);
-      setErr(t("unknownErr"));
-    } finally{
-      $("btnRender").disabled=false;
-      setStatus(t("ready"));
-    }
-  }
-
-  // Drag handlers (legend only)
-  function pointInLegend(px,py){
-    const b=__state.legendBox;
-    if(!b) return false;
-    return px>=b.x && px<=b.x+b.w && py>=b.y && py<=b.y+b.h;
-  }
-
-  function canvasToLocal(e){
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width/rect.width) / (window.devicePixelRatio||1);
-    const y = (e.clientY - rect.top) * (canvas.height/rect.height) / (window.devicePixelRatio||1);
-    return {x,y};
-  }
-
-  canvas.addEventListener("pointerdown",(e)=>{
-    if(!__state.lastDrawParams || !__state.legendBox) return;
-    const p=canvasToLocal(e);
-    if(pointInLegend(p.x,p.y)){
-      __state.dragging=true;
-      __state.dragDX = p.x - __state.legendBox.x;
-      __state.dragDY = p.y - __state.legendBox.y;
-      canvas.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    }
-  });
-  canvas.addEventListener("pointermove",(e)=>{
-    if(!__state.dragging || !__state.legendBox) return;
-    const p=canvasToLocal(e);
-    const W=__state.lastDrawParams.outW, H=__state.lastDrawParams.outH;
-    const pad=__state.lastDrawParams.pad;
-
-    let nx = p.x - __state.dragDX;
-    let ny = p.y - __state.dragDY;
-
-    // constrain within canvas bounds with a small margin
-    nx = Math.max(pad*0.25, Math.min(nx, W - __state.legendBox.w - pad*0.25));
-    ny = Math.max(pad*0.25, Math.min(ny, H - __state.legendBox.h - pad*0.25));
-
-    __state.legendBox.x = nx;
-    __state.legendBox.y = ny;
-
-    drawAll(__state.lastDrawParams);
-    e.preventDefault();
-  });
-  canvas.addEventListener("pointerup",(e)=>{
-    if(__state.dragging){
-      __state.dragging=false;
-      try{ canvas.releasePointerCapture(e.pointerId); } catch(_){ }
-      e.preventDefault();
+  canvas.addEventListener("mousedown", (ev) => {
+    if(!isFree() || !LEGEND_BOX) return;
+    const {x,y} = toCanvasXY(ev);
+    if(x >= LEGEND_BOX.x && x <= LEGEND_BOX.x + LEGEND_BOX.w && y >= LEGEND_BOX.y && y <= LEGEND_BOX.y + LEGEND_BOX.h){
+      LEGEND_FREE.active = true;
+      LEGEND_FREE.offX = x - LEGEND_BOX.x;
+      LEGEND_FREE.offY = y - LEGEND_BOX.y;
+      ev.preventDefault();
     }
   });
 
-  $("btnRender").addEventListener("click", renderNew);
+  window.addEventListener("mousemove", (ev) => {
+    if(!LEGEND_FREE.active) return;
+    if(!isFree()){ LEGEND_FREE.active = false; return; }
+    const {x,y} = toCanvasXY(ev);
+    LEGEND_FREE.x = x - LEGEND_FREE.offX;
+    LEGEND_FREE.y = y - LEGEND_FREE.offY;
+    render();
+  });
+
+  window.addEventListener("mouseup", () => { LEGEND_FREE.active = false; });
+  canvas.addEventListener("mouseleave", () => { LEGEND_FREE.active = false; });
+
+  const sel = $("legendSide");
+  if(sel){
+    sel.addEventListener("change", () => {
+      if(sel.value !== "free"){
+        LEGEND_FREE.x = null;
+        LEGEND_FREE.y = null;
+        LEGEND_FREE.active = false;
+      }
+    });
+  }
+})();
+
+  // wire
+  $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
   $("btnReset").addEventListener("click", () => {
     loadFromQuery();
