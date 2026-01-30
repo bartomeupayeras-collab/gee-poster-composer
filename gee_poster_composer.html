@@ -144,35 +144,25 @@
         <div class="row" style="margin-top:10px">
           <div style="flex:1">
             <label id="labLegendPos">Posició llegenda</label>
-            <select id="legendPos">
-              <option value="br" selected>Baix-dreta</option>
-              <option value="bl">Baix-esquerra</option>
-              <option value="tr">Dalt-dreta</option>
-              <option value="tl">Dalt-esquerra</option>
-              <option value="custom">Personalitzada</option>
+            <select id="legendSide">
+              <option value="br" selected>Baix dreta</option>
+              <option value="bl">Baix esquerra</option>
+              <option value="tr">Dalt dreta</option>
+              <option value="tl">Dalt esquerra</option>
+              <option value="custom">Personalitzat</option>
             </select>
             <div id="legendCustomWrap" style="display:none;margin-top:8px">
-              <div style="display:flex;gap:10px;align-items:center">
+              <div class="row" style="gap:10px;margin:0">
                 <div style="flex:1">
-                  <label id="labLegendX" style="margin:0 0 4px 0">X (%)</label>
-                  <input id="legendX" type="range" min="0" max="100" value="100" />
+                  <label style="font-size:12px;color:var(--muted)">X (%)</label>
+                  <input id="legendX" type="number" min="0" max="100" step="1" value="70" />
                 </div>
-                <div style="width:54px;text-align:right;font-weight:800;font-size:12px;color:var(--muted)">
-                  <span id="legendXVal">100</span>
-                </div>
-              </div>
-              <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
                 <div style="flex:1">
-                  <label id="labLegendY" style="margin:0 0 4px 0">Y (%)</label>
-                  <input id="legendY" type="range" min="0" max="100" value="100" />
-                </div>
-                <div style="width:54px;text-align:right;font-weight:800;font-size:12px;color:var(--muted)">
-                  <span id="legendYVal">100</span>
+                  <label style="font-size:12px;color:var(--muted)">Y (%)</label>
+                  <input id="legendY" type="number" min="0" max="100" step="1" value="72" />
                 </div>
               </div>
-              <div id="legendHint" style="margin-top:8px;font-size:11px;color:var(--muted)">
-                Arrossega els sliders per moure la llegenda dins el mapa.
-              </div>
+              <div class="hint" style="margin-top:6px">0% = esquerra/dalt · 100% = dreta/baix (dins el requadre del mapa)</div>
             </div>
           </div>
           <div style="flex:1">
@@ -244,8 +234,6 @@
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
       map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
-      legBR:"Baix-dreta", legBL:"Baix-esquerra", legTR:"Dalt-dreta", legTL:"Dalt-esquerra", legCustom:"Personalitzada",
-      legX:"X (%)", legY:"Y (%)", legHint:"Arrossega els sliders per moure la llegenda dins el mapa.",
       legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
@@ -261,8 +249,6 @@
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
       map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
-      legBR:"Abajo-derecha", legBL:"Abajo-izquierda", legTR:"Arriba-derecha", legTL:"Arriba-izquierda", legCustom:"Personalizada",
-      legX:"X (%)", legY:"Y (%)", legHint:"Mueve los deslizadores para colocar la leyenda dentro del mapa.",
       legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
@@ -287,8 +273,6 @@
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
-      legBR:"Bottom-right", legBL:"Bottom-left", legTR:"Top-right", legTL:"Top-left", legCustom:"Custom",
-      legX:"X (%)", legY:"Y (%)", legHint:"Use the sliders to position the legend inside the map.",
       left:"Left", right:"Right",
     }
   };
@@ -305,21 +289,15 @@
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
     if($("labLegendPos")) $("labLegendPos").textContent = t("legendPos");
-    $("labLegendX").textContent = t("legX");
-    $("labLegendY").textContent = t("legY");
-    $("legendHint").textContent = t("legHint");
-if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
+    if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     // option labels (Left/Right) for legend/scale selects
     const setSideOptionLabels = () => {
-      const legSel = $("legendPos");
+      const legSel = $("legendSide");
       const scSel  = $("scaleSide");
       if(legSel){
         legSel.querySelectorAll("option").forEach(o=>{
-          if(o.value==="br") o.textContent = t("legBR");
-          if(o.value==="bl") o.textContent = t("legBL");
-          if(o.value==="tr") o.textContent = t("legTR");
-          if(o.value==="tl") o.textContent = t("legTL");
-          if(o.value==="custom") o.textContent = t("legCustom");
+          if(o.value==="left") o.textContent = t("left");
+          if(o.value==="right") o.textContent = t("right");
         });
       }
       if(scSel){
@@ -484,8 +462,16 @@ if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null
+    dims:null,
+    // optional multi-map payload
+    maps:null,
+    labels:null,
+    legendMain:null,
+    legendDiff:null
   };
+
+  // Keep a reference to the last decoded payload (if any)
+  let QUERY_PAYLOAD = null;
 
   function loadFromQuery(){
     // preferred: ?p=
@@ -502,6 +488,17 @@ if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
             catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
           }
         }
+        QUERY_PAYLOAD = payload;
+        // Multi-map payload support
+        if(Array.isArray(payload.maps) && payload.maps.length){
+          initial.maps = payload.maps;
+          // take first url for the input field (still useful for manual mode)
+          const u0 = payload.maps[0] && (payload.maps[0].dataUrl || payload.maps[0].url || payload.maps[0]);
+          if(u0) initial.mapUrl = u0;
+        }
+        if(Array.isArray(payload.labels) && payload.labels.length) initial.labels = payload.labels;
+        if(payload.legendMain) initial.legendMain = payload.legendMain;
+        if(payload.legendDiff) initial.legendDiff = payload.legendDiff;
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
@@ -711,18 +708,33 @@ if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      // load map (try with CORS, fallback without)
-      let img=null;
-      mapUrl = expandThumbUrl(mapUrl, 0.10);
-      try{ img = await loadImage(mapUrl, true); }
-      catch(_e1){
-        try{ img = await loadImage(mapUrl, false); }
-        catch(_e2){
-          setErr(t("loadFail"));
-          return;
+      // load map(s) (try with CORS, fallback without)
+      let urls = [];
+      if(QUERY_PAYLOAD && Array.isArray(QUERY_PAYLOAD.maps) && QUERY_PAYLOAD.maps.length){
+        urls = QUERY_PAYLOAD.maps.map(m => (m && (m.dataUrl || m.url || m)) ).filter(Boolean);
+      } else {
+        urls = [mapUrl].filter(Boolean);
+      }
+      // Normalize & expand
+      urls = urls.map(u => expandThumbUrl(String(u).trim(), 0.10));
+
+      async function loadOne(u){
+        try{ return await loadImage(u, true); }
+        catch(_e1){
+          try{ return await loadImage(u, false); }
+          catch(_e2){ throw _e2; }
         }
       }
 
+      let imgs = [];
+      try{
+        imgs = await Promise.all(urls.map(loadOne));
+      }catch(_e){
+        setErr(t("loadFail"));
+        return;
+      }
+
+      const img = imgs[0];
     const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
@@ -766,7 +778,77 @@ if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     const mapW = W - pad*2;
     const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
 
-    // inner padding so the map content never touches the frame
+    // If we have 3 maps, compose 3 panels; otherwise keep the original single-panel layout.
+    const isThree = (typeof imgs !== "undefined" && imgs && imgs.length===3);
+
+    if(isThree){
+      const labels = (QUERY_PAYLOAD && Array.isArray(QUERY_PAYLOAD.labels) && QUERY_PAYLOAD.labels.length) ? QUERY_PAYLOAD.labels : ["", "", ""];
+      const gap = Math.round(36*S);
+      const labelH = Math.round(46*S);
+      const panelY = mapY + labelH;
+      const panelH = mapH - labelH;
+
+      const panelW = Math.floor((mapW - gap*2) / 3);
+      const inset = Math.round(18*S);
+
+      ctx.textAlign="center";
+      ctx.textBaseline="middle";
+      ctx.fillStyle="rgba(0,0,0,0.85)";
+      ctx.font="700 "+Math.round(28*S)+"px system-ui, sans-serif";
+
+      for(let i=0;i<3;i++){
+        const px = mapX + i*(panelW + gap);
+        const py = panelY;
+        const pw = panelW;
+        const ph = panelH;
+
+        // Label
+        const lab = (labels[i]!==undefined && labels[i]!==null) ? String(labels[i]) : "";
+        if(lab){
+          ctx.fillText(lab, px + pw/2, mapY + labelH/2);
+        }
+
+        // Panel frame (subtle rounded frame + border)
+        ctx.fillStyle = "#cfe8f3";
+        drawRoundedRect(ctx, px, py, pw, ph, Math.round(22*S));
+        ctx.fill();
+        ctx.strokeStyle="rgba(0,0,0,0.12)";
+        ctx.lineWidth=Math.max(1, Math.round(2*S));
+        drawRoundedRect(ctx, px, py, pw, ph, Math.round(22*S));
+        ctx.stroke();
+
+        // Inner area for the PNG
+        const innerX = px + inset;
+        const innerY = py + inset;
+        const innerW = pw - inset*2;
+        const innerH = ph - inset*2;
+
+        const im = imgs[i];
+        const ar = im.width / im.height;
+        const targetAr = innerW / innerH;
+        let drawW, drawH, dx, dy;
+        if(ar > targetAr){
+          drawW = innerW;
+          drawH = innerW / ar;
+          dx = innerX;
+          dy = innerY + (innerH - drawH)/2;
+        } else {
+          drawH = innerH;
+          drawW = innerH * ar;
+          dx = innerX + (innerW - drawW)/2;
+          dy = innerY;
+        }
+
+        // Clip to rounded rect and draw
+        ctx.save();
+        drawRoundedRect(ctx, px, py, pw, ph, Math.round(22*S));
+        ctx.clip();
+        ctx.drawImage(im, dx, dy, drawW, drawH);
+        ctx.restore();
+      }
+
+    } else {
+// inner padding so the map content never touches the frame
     const inset = Math.round(18*S);
     const innerX = mapX + inset;
     const innerY = mapY + inset;
@@ -816,11 +898,13 @@ if($("labScalePos")) $("labScalePos").textContent = t("scalePos");
     ctx.clip();
     ctx.drawImage(img, dx, dy, drawW, drawH);
     ctx.restore();
-    // overlays
-    const legendPos = ($("legendPos")? $("legendPos").value : "br");
-    const legendX = ($("legendX")? Number($("legendX").value||100) : 100);
-    const legendY = ($("legendY")? Number($("legendY").value||100) : 100);
-const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
+    
+    }
+// overlays
+    const legendSide = ($("legendSide")? $("legendSide").value : "br");
+    const legendXPct = parseFloat(($("legendX")? $("legendX").value : "80"));
+    const legendYPct = parseFloat(($("legendY")? $("legendY").value : "80"));
+    const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
     if(showNorth){
       drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
@@ -852,33 +936,72 @@ const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
       const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
-      // Legend position
-      let legX, legY;
-      if(legendPos==="custom"){
-        const availW = Math.max(0, mapW - 2*legMargin - legW);
-        const availH = Math.max(0, mapH - 2*legMargin - legH);
-        legX = mapX + legMargin + Math.round(availW * (legendX/100));
-        legY = mapY + legMargin + Math.round(availH * (legendY/100));
-      }else{
-        const onLeft = (legendPos==="bl" || legendPos==="tl");
-        const onTop  = (legendPos==="tl" || legendPos==="tr");
-        legX = onLeft ? (mapX + legMargin) : (mapX + mapW - legW - legMargin);
-        legY = onTop ? (mapY + legMargin) : (mapY + mapH - legH - legMargin);
+      // Position (corner or custom % inside the map frame)
+      const minX = mapX + legMargin;
+      const maxX = mapX + mapW - legW - legMargin;
+      const minY = mapY + legMargin;
+      const maxY = mapY + mapH - legH - legMargin;
 
-        // If scale is on and legend is bottom and on same side, stack legend above the scale bar
-        if(!onTop && showScale){
-          const sameSide = ( (onLeft && scaleSide==="left") || (!onLeft && scaleSide==="right") );
-          if(sameSide){
-            const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
-            const gap = Math.round(14*S);
-            legY = legY - scaleStackH - gap;
-          }
+      function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+      let legX = maxX, legY = maxY;
+      if(legendSide==="bl"){ legX = minX; legY = maxY; }
+      else if(legendSide==="tr"){ legX = maxX; legY = minY; }
+      else if(legendSide==="tl"){ legX = minX; legY = minY; }
+      else if(legendSide==="custom"){
+        const px = isFinite(legendXPct) ? legendXPct : 80;
+        const py = isFinite(legendYPct) ? legendYPct : 80;
+        legX = minX + (maxX - minX) * (px/100);
+        legY = minY + (maxY - minY) * (py/100);
+      } else { // br default
+        legX = maxX; legY = maxY;
+      }
+
+      // If scale is on and legend is bottom, optionally stack legend above the scale bar when the horizontal side matches
+      if(showScale && (legendSide==="br" || legendSide==="bl" || legendSide==="custom")){
+        // only apply stack for classic bottom-right/bottom-left when scale is bottom too
+        const sameHoriz = ( (legendSide==="br" && scaleSide==="right") || (legendSide==="bl" && scaleSide==="left") );
+        if(sameHoriz){
+          const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+          const gap = Math.round(14*S);
+          legY = legY - scaleStackH - gap;
         }
       }
-      // Safety clamp (keep inside the map)
-      legX = Math.min(Math.max(mapX + legMargin, legX), mapX + mapW - legW - legMargin);
-      legY = Math.min(Math.max(mapY + legMargin, legY), mapY + mapH - legH - legMargin);
-drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+
+      legX = clamp(legX, minX, maxX);
+      legY = clamp(legY, minY, maxY);
+
+      // Legend data (main + optional diff)
+      const legendMain = (QUERY_PAYLOAD && QUERY_PAYLOAD.legendMain) ? QUERY_PAYLOAD.legendMain : null;
+      const legendDiff = (QUERY_PAYLOAD && QUERY_PAYLOAD.legendDiff) ? QUERY_PAYLOAD.legendDiff : null;
+
+      const mainMin = (legendMain && legendMain.min!==null && legendMain.min!==undefined) ? String(legendMain.min) : vmin;
+      const mainMax = (legendMain && legendMain.max!==null && legendMain.max!==undefined) ? String(legendMain.max) : vmax;
+      const mainUnit = (legendMain && legendMain.unit!==undefined && legendMain.unit!==null) ? String(legendMain.unit) : unit;
+      const mainPal  = (legendMain && legendMain.palette) ? (Array.isArray(legendMain.palette) ? legendMain.palette : parsePalette(String(legendMain.palette))) : palette;
+
+      const hasDiff = !!legendDiff;
+      const diffMin = hasDiff && legendDiff.min!==null && legendDiff.min!==undefined ? String(legendDiff.min) : "";
+      const diffMax = hasDiff && legendDiff.max!==null && legendDiff.max!==undefined ? String(legendDiff.max) : "";
+      const diffUnit= hasDiff && legendDiff.unit!==undefined && legendDiff.unit!==null ? String(legendDiff.unit) : "Δ (B−A)";
+      const diffPal = hasDiff && legendDiff.palette ? (Array.isArray(legendDiff.palette) ? legendDiff.palette : parsePalette(String(legendDiff.palette))) : [];
+
+      const gapLeg = Math.round(14*S);
+      const legH2 = hasDiff ? Math.round(120*S) : 0;
+      const totalH = legH + (hasDiff ? (gapLeg + legH2) : 0);
+
+      // Ensure stacked legends stay inside the map frame (shift up if needed)
+      if(legY + totalH > maxY){
+        legY = clamp(maxY - totalH, minY, maxY);
+      }
+
+      // Draw main legend
+      drawLegend(ctx, legX, legY, legW, legH, mainMin, mainMax, mainUnit, mainPal, S);
+
+      // Draw diff legend (below)
+      if(hasDiff){
+        drawLegend(ctx, legX, legY + legH + gapLeg, legW, legH2, diffMin, diffMax, diffUnit, diffPal, S);
+      }
     }
 
     if(showFooter){
@@ -922,31 +1045,24 @@ drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
   $("btnDownload").addEventListener("click", download);
   $("btnReset").addEventListener("click", () => {
     loadFromQuery();
-    syncLegendCustomUI();
     setErr("");
     setStatus("");
   });
 
-  
-  // legend position (custom)
-  function syncLegendCustomUI(){
-    const pos = $("legendPos") ? $("legendPos").value : "br";
-    const wrap = $("legendCustomWrap");
-    if(wrap) wrap.style.display = (pos==="custom") ? "block" : "none";
-    const x = $("legendX") ? Number($("legendX").value||0) : 0;
-    const y = $("legendY") ? Number($("legendY").value||0) : 0;
-    if($("legendXVal")) $("legendXVal").textContent = String(x);
-    if($("legendYVal")) $("legendYVal").textContent = String(y);
-  }
-  if($("legendPos")){
-    $("legendPos").addEventListener("change", () => { syncLegendCustomUI(); });
-  }
-  if($("legendX")) $("legendX").addEventListener("input", syncLegendCustomUI);
-  if($("legendY")) $("legendY").addEventListener("input", syncLegendCustomUI);
-// init
+  // init
   applyLang();
   loadFromQuery();
-  syncLegendCustomUI();
+
+  // Legend custom position UI
+  const _legendSideEl = $("legendSide");
+  const _legendCustomWrap = $("legendCustomWrap");
+  function _syncLegendCustomUI(){
+    if(!_legendSideEl || !_legendCustomWrap) return;
+    _legendCustomWrap.style.display = (_legendSideEl.value==="custom") ? "block" : "none";
+  }
+  if(_legendSideEl){ _legendSideEl.addEventListener("change", _syncLegendCustomUI); }
+  _syncLegendCustomUI();
+
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
 </script>
