@@ -212,6 +212,9 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
+  // zoom factor for drawing map images on the canvas (kept at 1.0; visor already handles zoom)
+  const ZOOM = 1.0;
+
 
   // ---------- i18n ----------
   const I18N = {
