@@ -155,13 +155,19 @@
   <label style="display:block; font-weight:600; margin-bottom:4px;">Posició llegenda (px)</label>
   <div style="display:flex; gap:10px; align-items:center;">
     <div style="flex:1;">
-      <label style="display:block; font-size:12px; margin-bottom:2px;">X</label>
-      <input id="legendX" type="number" step="1" style="width:100%;" />
-    </div>
-    <div style="flex:1;">
-      <label style="display:block; font-size:12px; margin-bottom:2px;">Y</label>
-      <input id="legendY" type="number" step="1" style="width:100%;" />
-    </div>
+  <label style="display:block; font-size:12px; margin-bottom:2px;">X</label>
+  <input id="legendXRange" type="range" min="0" max="1000" value="0" step="1" style="width:100%;" />
+  <div style="display:flex; justify-content:space-between; font-size:11px; opacity:0.8; margin-top:2px;">
+    <span id="legendXVal">0</span><span>px</span>
+  </div>
+</div>
+<div style="flex:1;">
+  <label style="display:block; font-size:12px; margin-bottom:2px;">Y</label>
+  <input id="legendYRange" type="range" min="0" max="1000" value="0" step="1" style="width:100%;" />
+  <div style="display:flex; justify-content:space-between; font-size:11px; opacity:0.8; margin-top:2px;">
+    <span id="legendYVal">0</span><span>px</span>
+  </div>
+</div>
   </div>
   <div style="margin-top:6px; font-size:12px; color:#666;">Tip: també la pots arrossegar amb el ratolí quan és “Lliure”.</div>
 </div>
@@ -825,10 +831,10 @@ const W=outW, H=outH;
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
     // header
-    const headerH = Math.round(260*S);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
+    const (typeof headerH==="number"?headerH:0) = Math.round(260*S);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,(typeof headerH==="number"?headerH:0));
     ctx.strokeStyle="rgba(0,0,0,0.06)";
-    ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,(typeof headerH==="number"?headerH:0)); ctx.lineTo(W,(typeof headerH==="number"?headerH:0)); ctx.stroke();
 
       // poster header (single brand logo + title/subtitle)
       const logoH = Math.round(120*S);
@@ -857,7 +863,7 @@ const W=outW, H=outH;
       }
 
       // map frame region (start after header/text)
-      const mapTop = Math.max(headerH, Math.round(afterHeaderTextY + 34*S));
+      const mapTop = Math.max((typeof headerH==="number"?headerH:0), Math.round(afterHeaderTextY + 34*S));
     const mapX = pad;
     const mapY = mapTop;
     const mapW = W - pad*2;
@@ -1014,11 +1020,17 @@ if(showLegend){
     }
   }
 
+  if(legendSide === "free"){
+  // Clamp to canvas bounds (allow below maps)
+  legX = Math.min(Math.max(legX, pad + legMargin), ((typeof CW==="number"?CW:canvas.width) - pad) - legW - legMargin);
+  legY = Math.min(Math.max(legY, (typeof headerH==="number"?headerH:0) + legMargin), ((typeof CH==="number"?CH:canvas.height) - (typeof (typeof footerH==="number"?footerH:0)==="number"?(typeof footerH==="number"?footerH:0):0)) - totalH - legMargin);
+} else {
   // Clamp to map bounds
   legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
   legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - totalH - legMargin);
+}
 
-  // Register box for dragging (legend block: main + diff)
+// Register box for dragging (legend block: main + diff)
   LEGEND_BOX = {x: legX, y: legY, w: legW, h: totalH};
 
   // Main legend from hidden fields
@@ -1108,9 +1120,15 @@ if(showLegend){
     const {x,y} = toCanvasXY(ev);
     LEGEND_FREE.x = x - LEGEND_FREE.offX;
     LEGEND_FREE.y = y - LEGEND_FREE.offY;
-    // keep numeric inputs in sync while dragging
-    const ix = $("legendX"), iy = $("legendY");
-    if(ix && iy){ ix.value = Math.round(LEGEND_FREE.x); iy.value = Math.round(LEGEND_FREE.y); }
+    // keep slider values in sync while dragging
+    const ix = $("legendXRange"), iy = $("legendYRange");
+    if(ix && iy){
+      ix.value = Math.round(LEGEND_FREE.x);
+      iy.value = Math.round(LEGEND_FREE.y);
+      const xv=$("legendXVal"), yv=$("legendYVal");
+      if(xv) xv.textContent = String(ix.value);
+      if(yv) yv.textContent = String(iy.value);
+    }
     render();
   });
 
@@ -1119,8 +1137,8 @@ if(showLegend){
 
   const sel = $("legendSide");
   const wrap = $("legendXYWrap");
-  const inpX = $("legendX");
-  const inpY = $("legendY");
+  const inpX = $("legendXRange");
+  const inpY = $("legendYRange");
 
   function refreshLegendXYUI(){
     if(!wrap || !inpX || !inpY || !sel) return;
@@ -1131,9 +1149,21 @@ if(showLegend){
       if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
         render();
       }
-      if(isFinite(LEGEND_FREE.x)) inpX.value = Math.round(LEGEND_FREE.x);
-      if(isFinite(LEGEND_FREE.y)) inpY.value = Math.round(LEGEND_FREE.y);
-    }
+      const xv=$("legendXVal"), yv=$("legendYVal");
+if(isFinite(LEGEND_FREE.x)) { inpX.value = Math.round(LEGEND_FREE.x); if(xv) xv.textContent = String(inpX.value); }
+if(isFinite(LEGEND_FREE.y)) { inpY.value = Math.round(LEGEND_FREE.y); if(yv) yv.textContent = String(inpY.value); }
+
+// Allow moving legend anywhere inside the poster canvas (including below maps)
+// We don't know legend box size until it's measured during render; so keep a safe bound.
+try{
+  const c = $("canvas");
+  if(c){
+    inpX.min = 0; inpY.min = 0;
+    inpX.max = Math.max(0, Math.round(c.width - 10));
+    inpY.max = Math.max(0, Math.round(c.height - 10));
+  }
+}catch(e){}
+}
   }
 
   if(sel){
@@ -1155,6 +1185,9 @@ if(showLegend){
       const y = parseFloat(inpY.value);
       if(isFinite(x)) LEGEND_FREE.x = x;
       if(isFinite(y)) LEGEND_FREE.y = y;
+      const xv=$("legendXVal"), yv=$("legendYVal");
+      if(xv) xv.textContent = String(Math.round(LEGEND_FREE.x||0));
+      if(yv) yv.textContent = String(Math.round(LEGEND_FREE.y||0));
       render();
     };
     inpX.addEventListener("input", applyXY);
