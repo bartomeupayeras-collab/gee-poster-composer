@@ -547,22 +547,50 @@ palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
             catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
           }
         }
-        initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
+        // --- map urls: support both single-map and 3-map payloads ---
+// Possible payload formats:
+// 1) {dataUrl:"..."}
+// 2) {maps:[{url|dataUrl|mapUrl|map:"..."}, ...], labels:[...], legendDiff:{...}}
+// 3) {mapUrl1,mapUrl2,mapUrl3} or {map1,map2,map3} or {dataUrl1,dataUrl2,dataUrl3}
+const normUrl = (o) => {
+  if(!o) return "";
+  if(typeof o === "string") return o;
+  return o.url || o.dataUrl || o.mapUrl || o.map || o.thumb || "";
+};
 
-// Support 3-map compositions from the visor (payload.maps + payload.labels)
-if(Array.isArray(payload.maps) && payload.maps.length){
-  initial.maps = payload.maps;
+// Try 3-map first
+const mapsArr = []
+  .concat(Array.isArray(payload.maps) ? payload.maps : [])
+  .map(normUrl)
+  .filter(u => typeof u === "string" && u.trim());
+
+const alt3 = [
+  payload.mapUrl1, payload.mapUrl2, payload.mapUrl3,
+  payload.map1, payload.map2, payload.map3,
+  payload.dataUrl1, payload.dataUrl2, payload.dataUrl3,
+  payload.url1, payload.url2, payload.url3
+].map(u => (typeof u==="string"? u.trim():"")).filter(Boolean);
+
+if(mapsArr.length >= 2){
+  initial.maps = mapsArr.slice(0,3);
+} else if(alt3.length >= 2){
+  initial.maps = alt3.slice(0,3);
 }
+
+// Single-map fallback
+initial.mapUrl = normUrl(payload.dataUrl || payload.mapUrl || payload.map || payload.url || "") || normUrl(payload);
+
+if(!initial.mapUrl && Array.isArray(initial.maps) && initial.maps.length){
+  initial.mapUrl = initial.maps[0];
+}
+
+// Optional metadata for legends
 if(Array.isArray(payload.labels) && payload.labels.length){
-  initial.labels = payload.labels;
+  initial.labels = payload.labels.slice(0,3);
 }
-if(payload.legendMain){
-  initial.legendMain = payload.legendMain;
-}
-if(payload.legendDiff){
-  initial.legendDiff = payload.legendDiff;
-}
-        // Optional: map bbox & dims for a real scale bar
+if(payload.legendMain) initial.legendMain = payload.legendMain;
+if(payload.legendDiff) initial.legendDiff = payload.legendDiff;
+// Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
         }
@@ -595,10 +623,25 @@ if(payload.legendDiff){
           payload.meta?.mode || ""
         ].filter(Boolean).join("_");
         initial.filename = slug(f || payload.title || "poster") + ".png";
-      }catch(_e){ /* ignore */ }
+      }catch(_e){ setErr("Payload (?p=) invàlid o truncat: " + (_e && _e.message ? _e.message : String(_e))); }
     }
 
     if(!initial.mapUrl) initial.mapUrl = qs("map") || qs("mapUrl") || qs("url") || qs("dataUrl") || "";
+
+// Also allow 3-map via query params (?map=...&map2=...&map3=... or ?maps=a,b,c)
+if(!initial.maps || !initial.maps.length){
+  const m1 = qs("map") || qs("map1") || qs("mapUrl1") || qs("dataUrl1") || "";
+  const m2 = qs("map2") || qs("mapUrl2") || qs("dataUrl2") || "";
+  const m3 = qs("map3") || qs("mapUrl3") || qs("dataUrl3") || "";
+  const mapsCsv = qs("maps") || qs("mapUrls") || "";
+  let arr = [];
+  if(mapsCsv){
+    arr = mapsCsv.split(",").map(s=>s.trim()).filter(Boolean);
+  } else {
+    arr = [m1,m2,m3].map(s=>String(s||"").trim()).filter(Boolean);
+  }
+  if(arr.length>=2) initial.maps = arr.slice(0,3);
+}
     if(!initial.title) initial.title = qs("title") || initial.title;
     if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
     if(!initial.vmin) initial.vmin = qs("min") || "";
