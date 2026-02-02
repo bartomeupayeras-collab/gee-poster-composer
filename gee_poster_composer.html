@@ -147,6 +147,7 @@
             <select id="legendSide">
               <option value="right" selected>Dreta</option>
               <option value="left">Esquerra</option>
+              <option value="free">Lliure</option>
             </select>
           </div>
           <div style="flex:1">
@@ -238,7 +239,14 @@ function normalizePalette(pal, fallback){
     }
   }
   if(!Array.isArray(arr)) arr = [];
-  arr = arr.map(x=> (typeof x==="string"? x.trim(): x)).filter(isCssColor);
+  arr = arr.map(x=>{
+      if(typeof x==="string"){
+        let t=x.trim();
+        if(/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(t)) t = "#"+t;
+        return t;
+      }
+      return x;
+    }).filter(isCssColor);
   if(arr.length < 2) return fallback.slice();
   return arr;
 }
@@ -430,7 +438,9 @@ function drawImageCover(ctx, img, x, y, w, h){
   function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
 const fallbackMain = ["#7f3b08","#f6e8c3","#1b7837"];
-palette = normalizePalette(palette, fallbackMain);
+const fallbackDiff = ["#d73027","#f46d43","#fdae61","#fee08b","#ffffff","#abd9e9","#74add1","#4575b4"];
+const isDiffLegend = (String(unit||"").includes("Δ") || String(unit||"").toLowerCase().includes("b-a") || String(unit||"").toLowerCase().includes("b−a"));
+palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
 
 
     ctx.save();
