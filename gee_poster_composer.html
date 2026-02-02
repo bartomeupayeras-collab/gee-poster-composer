@@ -216,6 +216,43 @@
   const ZOOM = 1.0;
 
 
+// --- helpers: palette normalization + cover draw (no distortion) ---
+function isCssColor(s){
+  if(!s || typeof s !== "string") return false;
+  s = s.trim();
+  if(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return true;
+  if(/^(rgb|rgba|hsl|hsla)\(/i.test(s)) return true;
+  if(/^[a-zA-Z]+$/.test(s) && s.length <= 20) return true;
+  return false;
+}
+function normalizePalette(pal, fallback){
+  let arr = pal;
+  if(arr && typeof arr === "object" && !Array.isArray(arr) && Array.isArray(arr.palette)) arr = arr.palette;
+  if(typeof arr === "string"){
+    const s = arr.trim();
+    if(s.startsWith("[") && s.endsWith("]")){
+      try{ arr = JSON.parse(s); }catch(e){ arr = s; }
+    }
+    if(typeof arr === "string"){
+      arr = arr.split(",").map(x=>x.trim()).filter(Boolean);
+    }
+  }
+  if(!Array.isArray(arr)) arr = [];
+  arr = arr.map(x=> (typeof x==="string"? x.trim(): x)).filter(isCssColor);
+  if(arr.length < 2) return fallback.slice();
+  return arr;
+}
+function drawImageCover(ctx, img, x, y, w, h){
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if(!iw || !ih) return;
+  const s = Math.max(w/iw, h/ih);
+  const dw = iw*s, dh = ih*s;
+  const dx = x + (w - dw)/2;
+  const dy = y + (h - dh)/2;
+  ctx.drawImage(img, dx, dy, dw, dh);
+}
+
+
   // ---------- i18n ----------
   const I18N = {
     ca: {
@@ -391,6 +428,11 @@
     ctx.restore();
   }
   function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
+
+const fallbackMain = ["#7f3b08","#f6e8c3","#1b7837"];
+palette = normalizePalette(palette, fallbackMain);
+
+
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
