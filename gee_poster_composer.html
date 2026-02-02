@@ -150,6 +150,21 @@
               <option value="free">Lliure</option>
             </select>
           </div>
+
+<div id="legendXYWrap" style="flex:1; display:none;">
+  <label style="display:block; font-weight:600; margin-bottom:4px;">Posició llegenda (px)</label>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <div style="flex:1;">
+      <label style="display:block; font-size:12px; margin-bottom:2px;">X</label>
+      <input id="legendX" type="number" step="1" style="width:100%;" />
+    </div>
+    <div style="flex:1;">
+      <label style="display:block; font-size:12px; margin-bottom:2px;">Y</label>
+      <input id="legendY" type="number" step="1" style="width:100%;" />
+    </div>
+  </div>
+  <div style="margin-top:6px; font-size:12px; color:#666;">Tip: també la pots arrossegar amb el ratolí quan és “Lliure”.</div>
+</div>
           <div style="flex:1">
             <label id="labScalePos">Posició escala</label>
             <select id="scaleSide">
@@ -1093,6 +1108,9 @@ if(showLegend){
     const {x,y} = toCanvasXY(ev);
     LEGEND_FREE.x = x - LEGEND_FREE.offX;
     LEGEND_FREE.y = y - LEGEND_FREE.offY;
+    // keep numeric inputs in sync while dragging
+    const ix = $("legendX"), iy = $("legendY");
+    if(ix && iy){ ix.value = Math.round(LEGEND_FREE.x); iy.value = Math.round(LEGEND_FREE.y); }
     render();
   });
 
@@ -1100,6 +1118,24 @@ if(showLegend){
   canvas.addEventListener("mouseleave", () => { LEGEND_FREE.active = false; });
 
   const sel = $("legendSide");
+  const wrap = $("legendXYWrap");
+  const inpX = $("legendX");
+  const inpY = $("legendY");
+
+  function refreshLegendXYUI(){
+    if(!wrap || !inpX || !inpY || !sel) return;
+    const free = (sel.value === "free");
+    wrap.style.display = free ? "block" : "none";
+    if(free){
+      // Ensure a position exists (render() will init defaults if null)
+      if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
+        render();
+      }
+      if(isFinite(LEGEND_FREE.x)) inpX.value = Math.round(LEGEND_FREE.x);
+      if(isFinite(LEGEND_FREE.y)) inpY.value = Math.round(LEGEND_FREE.y);
+    }
+  }
+
   if(sel){
     sel.addEventListener("change", () => {
       if(sel.value !== "free"){
@@ -1107,8 +1143,26 @@ if(showLegend){
         LEGEND_FREE.y = null;
         LEGEND_FREE.active = false;
       }
+      refreshLegendXYUI();
+      render();
     });
   }
+
+  if(inpX && inpY){
+    const applyXY = () => {
+      if(!sel || sel.value !== "free") return;
+      const x = parseFloat(inpX.value);
+      const y = parseFloat(inpY.value);
+      if(isFinite(x)) LEGEND_FREE.x = x;
+      if(isFinite(y)) LEGEND_FREE.y = y;
+      render();
+    };
+    inpX.addEventListener("input", applyXY);
+    inpY.addEventListener("input", applyXY);
+  }
+
+  // initial UI state
+  refreshLegendXYUI();
 })();
 
   // wire
