@@ -236,8 +236,8 @@
   const qs = (k) => new URLSearchParams(location.search).get(k);
 
 function _normB64Url_(s){
-  // Convert base64url -> base64 and add padding
-  s = String(s || "").replace(/-/g, "+").replace(/_/g, "/");
+  // Accept both base64url and regular base64 coming from URLSearchParams (which turns '+' into spaces).
+  s = String(s || "").replace(/\s/g, "+").replace(/-/g, "+").replace(/_/g, "/");
   while (s.length % 4) s += "=";
   return s;
 }
