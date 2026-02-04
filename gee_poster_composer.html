@@ -240,16 +240,14 @@ let PM_PAYLOAD = null;
 window.addEventListener("message", (ev) => {
   try{
     if(ev && ev.data && ev.data.type === "GEE_COMPOSER_PAYLOAD"){
-      PM_PAYLOAD = ev.data.payload; // stringified JSON
-      // acknowledge
+      PM_PAYLOAD = ev.data.payload; // JSON string
       try{ ev.source && ev.source.postMessage({type:"GEE_COMPOSER_ACK"}, "*"); }catch(e){}
-      // reload UI from payload
+      // Reload from payload and redraw
       loadFromQuery();
       render();
     }
   }catch(e){}
 });
-
   // zoom factor for drawing map images on the canvas (kept at 1.0; visor already handles zoom)
   const ZOOM = 1.0;
 
