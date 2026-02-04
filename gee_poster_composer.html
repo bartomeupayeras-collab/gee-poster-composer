@@ -499,7 +499,11 @@
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         // Support 3 maps payload: payload.maps = [{dataUrl},...], payload.labels = [..]
         if(Array.isArray(payload.maps) && payload.maps.length){
-          initial.maps = payload.maps.map(m => (m && (m.dataUrl || m.mapUrl || m.url)) ? (m.dataUrl || m.mapUrl || m.url) : "").filter(Boolean);
+          initial.maps = payload.maps.map(m => {
+            if(typeof m === "string") return m;
+            if(m && (m.dataUrl || m.mapUrl || m.url)) return (m.dataUrl || m.mapUrl || m.url);
+            return "";
+          }).filter(Boolean);
           if(initial.maps[0]) initial.mapUrl = initial.maps[0];
           if(initial.maps[1]) initial.mapUrl2 = initial.maps[1];
           if(initial.maps[2]) initial.mapUrl3 = initial.maps[2];
