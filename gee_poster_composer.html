@@ -241,6 +241,14 @@ function _normB64Url_(s){
   while (s.length % 4) s += "=";
   return s;
 }
+
+function _b64ToUtf8_(b64urlOrB64){
+  const b64 = _normB64Url_(b64urlOrB64);
+  const bin = atob(b64);
+  // Decode UTF-8 bytes back into a JS string
+  const esc = Array.prototype.map.call(bin, c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('');
+  return decodeURIComponent(esc);
+}
   // zoom factor for drawing map images on the canvas (kept at 1.0; visor already handles zoom)
   const ZOOM = 1.0;
 
@@ -550,8 +558,8 @@ palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
           try{ payload=JSON.parse(decodeURIComponent(p)); }
           catch(_e2){
             // Some launchers may base64-encode the payload
-            try{ payload=JSON.parse(atob(_normB64Url_(p))); }
-            catch(_e3){ payload=JSON.parse(atob(_normB64Url_(decodeURIComponent(p)))); }
+            try{ payload=JSON.parse(_b64ToUtf8_(p)); }
+            catch(_e3){ payload=JSON.parse(_b64ToUtf8_(decodeURIComponent(p))); }
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
