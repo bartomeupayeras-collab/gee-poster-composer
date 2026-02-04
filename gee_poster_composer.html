@@ -147,36 +147,13 @@
             <select id="legendSide">
               <option value="right" selected>Dreta</option>
               <option value="left">Esquerra</option>
-              <option value="free">Lliure</option>
             </select>
           </div>
-
-<div id="legendXYWrap" style="flex:1; display:none;">
-  <label style="display:block; font-weight:600; margin-bottom:4px;">Posició llegenda (px)</label>
-  <div style="display:flex; gap:10px; align-items:center;">
-    <div style="flex:1;">
-  <label style="display:block; font-size:12px; margin-bottom:2px;">X</label>
-  <input id="legendXRange" type="range" min="0" max="1000" value="0" step="1" style="width:100%;" />
-  <div style="display:flex; justify-content:space-between; font-size:11px; opacity:0.8; margin-top:2px;">
-    <span id="legendXVal">0</span><span>px</span>
-  </div>
-</div>
-<div style="flex:1;">
-  <label style="display:block; font-size:12px; margin-bottom:2px;">Y</label>
-  <input id="legendYRange" type="range" min="0" max="1000" value="0" step="1" style="width:100%;" />
-  <div style="display:flex; justify-content:space-between; font-size:11px; opacity:0.8; margin-top:2px;">
-    <span id="legendYVal">0</span><span>px</span>
-  </div>
-</div>
-  </div>
-  <div style="margin-top:6px; font-size:12px; color:#666;">Tip: també la pots arrossegar amb el ratolí quan és “Lliure”.</div>
-</div>
           <div style="flex:1">
             <label id="labScalePos">Posició escala</label>
             <select id="scaleSide">
               <option value="left" selected>Esquerra</option>
               <option value="right">Dreta</option>
-              <option value="free">Lliure</option>
             </select>
           </div>
         </div>
@@ -235,67 +212,6 @@
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
 
-// --- postMessage payload handoff (from GEE visor) ---
-let PM_PAYLOAD = null;
-window.addEventListener("message", (ev) => {
-  try{
-    if(ev && ev.data && ev.data.type === "GEE_COMPOSER_PAYLOAD"){
-      PM_PAYLOAD = ev.data.payload; // JSON string
-      try{ ev.source && ev.source.postMessage({type:"GEE_COMPOSER_ACK"}, "*"); }catch(e){}
-      // Reload from payload and redraw
-      loadFromQuery();
-      render();
-    }
-  }catch(e){}
-});
-  // zoom factor for drawing map images on the canvas (kept at 1.0; visor already handles zoom)
-  const ZOOM = 1.0;
-
-
-// --- helpers: palette normalization + cover draw (no distortion) ---
-function isCssColor(s){
-  if(!s || typeof s !== "string") return false;
-  s = s.trim();
-  if(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return true;
-  if(/^(rgb|rgba|hsl|hsla)\(/i.test(s)) return true;
-  if(/^[a-zA-Z]+$/.test(s) && s.length <= 20) return true;
-  return false;
-}
-function normalizePalette(pal, fallback){
-  let arr = pal;
-  if(arr && typeof arr === "object" && !Array.isArray(arr) && Array.isArray(arr.palette)) arr = arr.palette;
-  if(typeof arr === "string"){
-    const s = arr.trim();
-    if(s.startsWith("[") && s.endsWith("]")){
-      try{ arr = JSON.parse(s); }catch(e){ arr = s; }
-    }
-    if(typeof arr === "string"){
-      arr = arr.split(",").map(x=>x.trim()).filter(Boolean);
-    }
-  }
-  if(!Array.isArray(arr)) arr = [];
-  arr = arr.map(x=>{
-      if(typeof x==="string"){
-        let t=x.trim();
-        if(/^([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(t)) t = "#"+t;
-        return t;
-      }
-      return x;
-    }).filter(isCssColor);
-  if(arr.length < 2) return fallback.slice();
-  return arr;
-}
-function drawImageCover(ctx, img, x, y, w, h){
-  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-  if(!iw || !ih) return;
-  const s = Math.max(w/iw, h/ih);
-  const dw = iw*s, dh = ih*s;
-  const dx = x + (w - dw)/2;
-  const dy = y + (h - dh)/2;
-  ctx.drawImage(img, dx, dy, dw, dh);
-}
-
-
   // ---------- i18n ----------
   const I18N = {
     ca: {
@@ -311,7 +227,7 @@ function drawImageCover(ctx, img, x, y, w, h){
       missingMap:"Falta l'URL del mapa (PNG).",
       loadFail:"No s'ha pogut carregar el PNG del mapa.\n\n• Revisa que l'URL sigui correcte i no hagi expirat.\n• Pot ser CORS o permissos.\n\nProva d'obrir l'URL en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.",
       dlFail:"No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n",
-      left:"Esquerra", right:"Dreta", free:"Lliure",
+      left:"Esquerra", right:"Dreta",
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
@@ -326,7 +242,7 @@ function drawImageCover(ctx, img, x, y, w, h){
       missingMap:"Falta la URL del mapa (PNG).",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
-      left:"Izquierda", right:"Derecha", free:"Libre",
+      left:"Izquierda", right:"Derecha",
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
@@ -341,7 +257,7 @@ function drawImageCover(ctx, img, x, y, w, h){
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
-      left:"Left", right:"Right", free:"Free",
+      left:"Left", right:"Right",
     }
   };
   let LANG = qs("lang") || "ca";
@@ -366,15 +282,13 @@ function drawImageCover(ctx, img, x, y, w, h){
         legSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-                  if(o.value==="free") o.textContent = t("free");
-});
+        });
       }
       if(scSel){
         scSel.querySelectorAll("option").forEach(o=>{
           if(o.value==="left") o.textContent = t("left");
           if(o.value==="right") o.textContent = t("right");
-                  if(o.value==="free") o.textContent = t("free");
-});
+        });
       }
     };
     setSideOptionLabels();
@@ -471,13 +385,6 @@ function drawImageCover(ctx, img, x, y, w, h){
     ctx.restore();
   }
   function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
-
-const fallbackMain = ["#7f3b08","#f6e8c3","#1b7837"];
-const fallbackDiff = ["#d73027","#f46d43","#fdae61","#fee08b","#ffffff","#abd9e9","#74add1","#4575b4"];
-const isDiffLegend = (String(unit||"").includes("Δ") || String(unit||"").toLowerCase().includes("b-a") || String(unit||"").toLowerCase().includes("b−a"));
-palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
-
-
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
@@ -539,16 +446,12 @@ palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
     mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null,
-    maps:null,          // optional: [{dataUrl:...}, ...] or [url,...]
-    labels:null,        // optional: [label1,label2,label3]
-    legendMain:null,    // optional: {min,max,unit,palette}
-    legendDiff:null     // optional: {min,max,unit,palette}
+    dims:null
   };
 
   function loadFromQuery(){
     // preferred: ?p=
-    const p = (PM_PAYLOAD && String(PM_PAYLOAD)) || qs("p");
+    const p = qs("p");
     if(p){
       try{
         let payload=null;
@@ -556,26 +459,19 @@ palette = normalizePalette(palette, isDiffLegend ? fallbackDiff : fallbackMain);
         catch(_e1){
           try{ payload=JSON.parse(decodeURIComponent(p)); }
           catch(_e2){
-            // Some launchers may base64-encode the payload
-            try{ payload=JSON.parse(atob(p)); }
-            catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
+            // Some launchers may base64-encode the payload (including base64url)
+            const b64u2b64 = (s)=>{
+              s = String(s||'').replace(/-/g,'+').replace(/_/g,'/');
+              // pad to multiple of 4
+              const pad = s.length % 4;
+              if(pad) s += '===='.slice(pad);
+              return s;
+            };
+            try{ payload=JSON.parse(atob(b64u2b64(p))); }
+            catch(_e3){ payload=JSON.parse(atob(b64u2b64(decodeURIComponent(p)))); }
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-
-// Support 3-map compositions from the visor (payload.maps + payload.labels)
-if(Array.isArray(payload.maps) && payload.maps.length){
-  initial.maps = payload.maps;
-}
-if(Array.isArray(payload.labels) && payload.labels.length){
-  initial.labels = payload.labels;
-}
-if(payload.legendMain){
-  initial.legendMain = payload.legendMain;
-}
-if(payload.legendDiff){
-  initial.legendDiff = payload.legendDiff;
-}
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -626,26 +522,6 @@ if(payload.legendDiff){
     setIf("mapUrl", initial.mapUrl);
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
-
-// If the visor provided multi-map payload, keep it in memory for render()
-if(initial.maps && Array.isArray(initial.maps) && initial.maps.length){
-  PAYLOAD_MAPS = initial.maps.map(m => (m && typeof m === "object") ? (m.dataUrl || m.url || m.mapUrl || "") : String(m));
-  PAYLOAD_MAPS = PAYLOAD_MAPS.filter(u => !!u);
-}
-if(initial.labels && Array.isArray(initial.labels) && initial.labels.length){
-  PAYLOAD_LABELS = initial.labels.map(x => String(x));
-}
-if(initial.legendMain){
-  // Override hidden legend inputs with main legend (if provided)
-  if(isFinite(initial.legendMain.min)) initial.vmin = String(initial.legendMain.min);
-  if(isFinite(initial.legendMain.max)) initial.vmax = String(initial.legendMain.max);
-  if(initial.legendMain.unit != null) initial.unit = String(initial.legendMain.unit);
-  if(initial.legendMain.palette != null) initial.palette = String(initial.legendMain.palette);
-}
-if(initial.legendDiff){
-  PAYLOAD_LEGEND_DIFF = initial.legendDiff;
-}
-
     setIf("vmin", initial.vmin);
     setIf("vmax", initial.vmax);
     setIf("unit", initial.unit);
@@ -661,15 +537,6 @@ if(initial.legendDiff){
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
 
-
-// ---- payload-driven multi-map support (kept minimal) ----
-let PAYLOAD_MAPS = null;   // array of urls (len 3) or null
-let PAYLOAD_LABELS = null; // array of labels (len 3) or null
-let PAYLOAD_LEGEND_DIFF = null; // {min,max,unit,palette} or null
-
-// ---- free legend drag state (only active when legendSide == "free") ----
-let LEGEND_FREE = {x:null, y:null, active:false, offX:0, offY:0};
-let LEGEND_BOX = null; // {x,y,w,h}
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
     canvas.width=outW*dpr;
@@ -813,42 +680,27 @@ let LEGEND_BOX = null; // {x,y,w,h}
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
 
-      
-// load map(s) (try with CORS, fallback without)
-let imgs = [];
-let urls = null;
+      // load map (try with CORS, fallback without)
+      let img=null;
+      mapUrl = expandThumbUrl(mapUrl, 0.10);
+      try{ img = await loadImage(mapUrl, true); }
+      catch(_e1){
+        try{ img = await loadImage(mapUrl, false); }
+        catch(_e2){
+          setErr(t("loadFail"));
+          return;
+        }
+      }
 
-if(Array.isArray(PAYLOAD_MAPS) && PAYLOAD_MAPS.length === 3){
-  urls = PAYLOAD_MAPS.slice();
-} else {
-  urls = [mapUrl];
-}
-
-try{
-  for(let i=0;i<urls.length;i++){
-    let u = expandThumbUrl(String(urls[i]||""), 0.10);
-    let im=null;
-    try{ im = await loadImage(u, true); }
-    catch(_e1){ im = await loadImage(u, false); }
-    imgs.push(im);
-  }
-}catch(_e){
-  setErr(t("loadFail"));
-  return;
-}
-
-// keep backward-compat variable name for existing code paths
-let img = imgs[0];
-
-const W=outW, H=outH;
+    const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
     // header
-    const (typeof headerH==="number"?headerH:0) = Math.round(260*S);
-    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,(typeof headerH==="number"?headerH:0));
+    const headerH = Math.round(260*S);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
     ctx.strokeStyle="rgba(0,0,0,0.06)";
-    ctx.beginPath(); ctx.moveTo(0,(typeof headerH==="number"?headerH:0)); ctx.lineTo(W,(typeof headerH==="number"?headerH:0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
       // poster header (single brand logo + title/subtitle)
       const logoH = Math.round(120*S);
@@ -877,7 +729,7 @@ const W=outW, H=outH;
       }
 
       // map frame region (start after header/text)
-      const mapTop = Math.max((typeof headerH==="number"?headerH:0), Math.round(afterHeaderTextY + 34*S));
+      const mapTop = Math.max(headerH, Math.round(afterHeaderTextY + 34*S));
     const mapX = pad;
     const mapY = mapTop;
     const mapW = W - pad*2;
@@ -890,38 +742,37 @@ const W=outW, H=outH;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    
-// frame + content
-ctx.save();
-drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-ctx.clip();
-
-if(imgs.length === 3){
-  const colGap = Math.round(14*S);
-  const colW = (innerW - colGap*2) / 3;
-  for(let i=0;i<3;i++){
-    const im = imgs[i];
-    const colX = innerX + i*(colW + colGap);
-    const colY = innerY;
-    const colH = innerH;
-
-    // aspect fit per column
-    const ar = im.width / im.height;
-    const targetAr = colW / colH;
+    // aspect fit map
+    const ar = img.width / img.height;
+    const targetAr = innerW / innerH;
     let drawW, drawH, dx, dy;
     if(ar > targetAr){
-      drawW = colW;
-      drawH = colW / ar;
-      dx = colX;
-      dy = colY + (colH - drawH)/2;
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
     } else {
-      drawH = colH;
-      drawW = colH * ar;
-      dx = colX + (colW - drawW)/2;
-      dy = colY;
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
     }
 
-    // apply zoom about center
+    // frame + clip
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
+    ctx.fillStyle = "#cfe8f3";
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.fill();
+
+    ctx.strokeStyle="rgba(0,0,0,0.12)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.stroke();
+
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
     const cx = dx + drawW/2;
     const cy = dy + drawH/2;
     drawW = drawW * ZOOM;
@@ -929,49 +780,11 @@ if(imgs.length === 3){
     dx = cx - drawW/2;
     dy = cy - drawH/2;
 
-    ctx.drawImage(im, dx, dy, drawW, drawH);
-
-    // optional per-panel label (if provided)
-    if(PAYLOAD_LABELS && PAYLOAD_LABELS[i] != null){
-      ctx.save();
-      ctx.fillStyle = "rgba(255,255,255,0.85)";
-      const bh = Math.round(44*S);
-      ctx.fillRect(colX + Math.round(12*S), colY + Math.round(12*S), Math.round(colW - 24*S), bh);
-      ctx.fillStyle = "#111";
-      ctx.font = "700 " + Math.round(26*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(PAYLOAD_LABELS[i]), colX + Math.round(24*S), colY + Math.round(12*S) + bh/2);
-      ctx.restore();
-    }
-  }
-} else {
-  // aspect fit single map
-  const ar = img.width / img.height;
-  const targetAr = innerW / innerH;
-  let drawW, drawH, dx, dy;
-  if(ar > targetAr){
-    drawW = innerW;
-    drawH = innerW / ar;
-    dx = innerX;
-    dy = innerY + (innerH - drawH)/2;
-  } else {
-    drawH = innerH;
-    drawW = innerH * ar;
-    dx = innerX + (innerW - drawW)/2;
-    dy = innerY;
-  }
-
-  // zoom
-  const cx = dx + drawW/2;
-  const cy = dy + drawH/2;
-  drawW = drawW * ZOOM;
-  drawH = drawH * ZOOM;
-  dx = cx - drawW/2;
-  dy = cy - drawH/2;
-
-  ctx.drawImage(img, dx, dy, drawW, drawH);
-}ctx.restore();
+    ctx.save();
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+    ctx.restore();
     // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
@@ -1001,71 +814,28 @@ if(imgs.length === 3){
           drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
         }
       }
-    
-if(showLegend){
-  const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-  const legH = Math.round(140*S);
-  const legMargin = Math.round(26*S);
-  const gap = Math.round(14*S);
+    if(showLegend){
+      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      const legH = Math.round(140*S);
+      const legMargin = Math.round(26*S);
 
-  const hasDiffLegend = !!(PAYLOAD_LEGEND_DIFF && isFinite(PAYLOAD_LEGEND_DIFF.min) && isFinite(PAYLOAD_LEGEND_DIFF.max) && PAYLOAD_LEGEND_DIFF.palette);
-  const totalH = hasDiffLegend ? (legH*2 + gap) : legH;
+      // Base position by side
+      const legX = (legendSide==="left")
+        ? (mapX + legMargin)
+        : (mapX + mapW - legW - legMargin);
 
-  let legX, legY;
+      // If scale is on and same side, stack legend above the scale bar
+      let legY = mapY + mapH - legH - legMargin;
+      if(showScale && legendSide === scaleSide){
+        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
+        const gap = Math.round(14*S);
+        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+      }
+      // Safety clamp (avoid going above the map)
+      legY = Math.max(mapY + legMargin, legY);
 
-  if(legendSide === "free"){
-    // Init default free position (bottom-right)
-    if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
-      LEGEND_FREE.x = mapX + mapW - legW - legMargin;
-      LEGEND_FREE.y = mapY + mapH - totalH - legMargin;
+      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
-    legX = LEGEND_FREE.x;
-    legY = LEGEND_FREE.y;
-  } else {
-    legX = (legendSide==="left")
-      ? (mapX + legMargin)
-      : (mapX + mapW - legW - legMargin);
-
-    // If scale is on and same side, stack legend above the scale bar
-    legY = mapY + mapH - totalH - legMargin;
-    if(showScale && legendSide === scaleSide){
-      const scaleStackH = Math.round(54*S); // approx footprint of scale + label
-      legY = legY - scaleStackH - gap;
-    }
-  }
-
-  if(legendSide === "free"){
-  // Clamp to canvas bounds (allow below maps)
-  legX = Math.min(Math.max(legX, pad + legMargin), ((typeof CW==="number"?CW:canvas.width) - pad) - legW - legMargin);
-  legY = Math.min(Math.max(legY, (typeof headerH==="number"?headerH:0) + legMargin), ((typeof CH==="number"?CH:canvas.height) - (typeof (typeof footerH==="number"?footerH:0)==="number"?(typeof footerH==="number"?footerH:0):0)) - totalH - legMargin);
-} else {
-  // Clamp to map bounds
-  legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
-  legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - totalH - legMargin);
-}
-
-// Register box for dragging (legend block: main + diff)
-  LEGEND_BOX = {x: legX, y: legY, w: legW, h: totalH};
-
-  // Main legend from hidden fields
-  drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
-
-  // Diff legend (if provided by visor)
-  if(hasDiffLegend){
-    drawLegend(
-      ctx,
-      legX,
-      legY + legH + gap,
-      legW,
-      legH,
-      String(PAYLOAD_LEGEND_DIFF.min),
-      String(PAYLOAD_LEGEND_DIFF.max),
-      String(PAYLOAD_LEGEND_DIFF.unit || "Δ (B−A)"),
-      String(PAYLOAD_LEGEND_DIFF.palette),
-      S
-    );
-  }
-}
 
     if(showFooter){
       // Single footer (right aligned). If user provides a footer text, it replaces the default.
@@ -1102,115 +872,6 @@ if(showLegend){
       setErr(t("dlFail") + e);
     }
   }
-
-
-// --- enable legend drag when legend position is 'free' ---
-(function(){
-  if(!canvas) return;
-
-  const toCanvasXY = (ev) => {
-    const r = canvas.getBoundingClientRect();
-    const x = (ev.clientX - r.left) * (canvas.width / (window.devicePixelRatio||1)) / r.width;
-    const y = (ev.clientY - r.top)  * (canvas.height / (window.devicePixelRatio||1)) / r.height;
-    return {x,y};
-  };
-
-  const isFree = () => $("legendSide") && $("legendSide").value === "free";
-
-  canvas.addEventListener("mousedown", (ev) => {
-    if(!isFree() || !LEGEND_BOX) return;
-    const {x,y} = toCanvasXY(ev);
-    if(x >= LEGEND_BOX.x && x <= LEGEND_BOX.x + LEGEND_BOX.w && y >= LEGEND_BOX.y && y <= LEGEND_BOX.y + LEGEND_BOX.h){
-      LEGEND_FREE.active = true;
-      LEGEND_FREE.offX = x - LEGEND_BOX.x;
-      LEGEND_FREE.offY = y - LEGEND_BOX.y;
-      ev.preventDefault();
-    }
-  });
-
-  window.addEventListener("mousemove", (ev) => {
-    if(!LEGEND_FREE.active) return;
-    if(!isFree()){ LEGEND_FREE.active = false; return; }
-    const {x,y} = toCanvasXY(ev);
-    LEGEND_FREE.x = x - LEGEND_FREE.offX;
-    LEGEND_FREE.y = y - LEGEND_FREE.offY;
-    // keep slider values in sync while dragging
-    const ix = $("legendXRange"), iy = $("legendYRange");
-    if(ix && iy){
-      ix.value = Math.round(LEGEND_FREE.x);
-      iy.value = Math.round(LEGEND_FREE.y);
-      const xv=$("legendXVal"), yv=$("legendYVal");
-      if(xv) xv.textContent = String(ix.value);
-      if(yv) yv.textContent = String(iy.value);
-    }
-    render();
-  });
-
-  window.addEventListener("mouseup", () => { LEGEND_FREE.active = false; });
-  canvas.addEventListener("mouseleave", () => { LEGEND_FREE.active = false; });
-
-  const sel = $("legendSide");
-  const wrap = $("legendXYWrap");
-  const inpX = $("legendXRange");
-  const inpY = $("legendYRange");
-
-  function refreshLegendXYUI(){
-    if(!wrap || !inpX || !inpY || !sel) return;
-    const free = (sel.value === "free");
-    wrap.style.display = free ? "block" : "none";
-    if(free){
-      // Ensure a position exists (render() will init defaults if null)
-      if(!(isFinite(LEGEND_FREE.x) && isFinite(LEGEND_FREE.y))){
-        render();
-      }
-      const xv=$("legendXVal"), yv=$("legendYVal");
-if(isFinite(LEGEND_FREE.x)) { inpX.value = Math.round(LEGEND_FREE.x); if(xv) xv.textContent = String(inpX.value); }
-if(isFinite(LEGEND_FREE.y)) { inpY.value = Math.round(LEGEND_FREE.y); if(yv) yv.textContent = String(inpY.value); }
-
-// Allow moving legend anywhere inside the poster canvas (including below maps)
-// We don't know legend box size until it's measured during render; so keep a safe bound.
-try{
-  const c = $("canvas");
-  if(c){
-    inpX.min = 0; inpY.min = 0;
-    inpX.max = Math.max(0, Math.round(c.width - 10));
-    inpY.max = Math.max(0, Math.round(c.height - 10));
-  }
-}catch(e){}
-}
-  }
-
-  if(sel){
-    sel.addEventListener("change", () => {
-      if(sel.value !== "free"){
-        LEGEND_FREE.x = null;
-        LEGEND_FREE.y = null;
-        LEGEND_FREE.active = false;
-      }
-      refreshLegendXYUI();
-      render();
-    });
-  }
-
-  if(inpX && inpY){
-    const applyXY = () => {
-      if(!sel || sel.value !== "free") return;
-      const x = parseFloat(inpX.value);
-      const y = parseFloat(inpY.value);
-      if(isFinite(x)) LEGEND_FREE.x = x;
-      if(isFinite(y)) LEGEND_FREE.y = y;
-      const xv=$("legendXVal"), yv=$("legendYVal");
-      if(xv) xv.textContent = String(Math.round(LEGEND_FREE.x||0));
-      if(yv) yv.textContent = String(Math.round(LEGEND_FREE.y||0));
-      render();
-    };
-    inpX.addEventListener("input", applyXY);
-    inpY.addEventListener("input", applyXY);
-  }
-
-  // initial UI state
-  refreshLegendXYUI();
-})();
 
   // wire
   $("btnRender").addEventListener("click", render);
