@@ -431,21 +431,22 @@
   
   function drawMapLabel(ctx,label,x,y,w,h,S){
     ctx.save();
-    const pad = Math.round(12*S);
+    // Slightly tighter label band so the map fills more of the panel
+    const pad = Math.round(10*S);
     ctx.font = "900 " + Math.round(26*S) + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const boxW = Math.min(w*0.9, ctx.measureText(label).width + pad*4);
-    const boxH = Math.round(40*S);
+    const boxH = Math.round(32*S);
     const bx = x + w/2 - boxW/2;
-    const by = y + Math.round(12*S);
+    const by = y + Math.round(8*S);
     ctx.globalAlpha = 0.92;
     ctx.fillStyle = "#ffffff";
     drawRoundedRect(ctx, bx, by, boxW, boxH, Math.round(14*S));
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#111";
-    ctx.fillText(label, x + w/2, by + Math.round(7*S));
+    ctx.fillText(label, x + w/2, by + Math.round(5*S));
     ctx.restore();
   }
 
@@ -901,8 +902,21 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const arS = im.width / im.height;
           const tar = sw/sh;
           let dW, dH, dX, dY;
-          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
-          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
+          // COVER mode: fill the whole panel and crop the excess.
+          // This removes the large white bands top/bottom on tall islands.
+          if(arS > tar){
+            // image is wider than target -> match height, crop left/right
+            dH = sh;
+            dW = sh * arS;
+            dX = sx + (sw - dW) / 2;
+            dY = sy;
+          } else {
+            // image is taller than target -> match width, crop top/bottom
+            dW = sw;
+            dH = sw / arS;
+            dX = sx;
+            dY = sy + (sh - dH) / 2;
+          }
           const Z=1.12;
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
@@ -937,8 +951,18 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const arS = im.width / im.height;
           const tar = sw/sh;
           let dW, dH, dX, dY;
-          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
-          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
+          // COVER mode: fill the whole panel and crop the excess.
+          if(arS > tar){
+            dH = sh;
+            dW = sh * arS;
+            dX = sx + (sw - dW) / 2;
+            dY = sy;
+          } else {
+            dW = sw;
+            dH = sw / arS;
+            dX = sx;
+            dY = sy + (sh - dH) / 2;
+          }
           const Z=1.12;
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
