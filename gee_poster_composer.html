@@ -966,7 +966,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
         }
-      }
       } else {
         const slotH = (innerH - gapIn*2)/3;
         for(let i=0;i<3;i++){
