@@ -106,17 +106,18 @@
       <div class="pad">
         <label id="labMap"></label>
         <input id="mapUrl" placeholder="" />
-        <div class="hint" style="margin-top:6px" id="hintMulti"></div>
+
         <div class="row" style="margin-top:10px">
           <div style="flex:1">
-            <label id="labMap2"></label>
+            <label id="labMap2">Mapa 2</label>
             <input id="mapUrl2" placeholder="" />
           </div>
           <div style="flex:1">
-            <label id="labMap3"></label>
+            <label id="labMap3">Mapa 3</label>
             <input id="mapUrl3" placeholder="" />
           </div>
         </div>
+
 
         <div class="row">
           <div style="flex:1">
@@ -147,7 +148,6 @@
 
         <div class="pillbar">
           <label class="pill"><input type="checkbox" id="showLegend" checked> <span id="togLegend"></span></label>
-          <label class="pill"><input type="checkbox" id="dragLegend"> <span id="togDragLegend"></span></label>
           <label class="pill"><input type="checkbox" id="showNorth" checked> <span id="togNorth"></span></label>
           <label class="pill"><input type="checkbox" id="showScale"> <span id="togScale"></span></label>
           <label class="pill"><input type="checkbox" id="showFooter" checked> <span id="togFooter"></span></label>
@@ -167,6 +167,13 @@
               <option value="left" selected>Esquerra</option>
               <option value="right">Dreta</option>
             </select>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1; display:flex; align-items:center; gap:10px">
+            <input type="checkbox" id="legendDrag" />
+            <label for="legendDrag" id="labLegendDrag" style="margin:0; cursor:pointer">Moure llegenda (arrossegar)</label>
           </div>
         </div>
 
@@ -228,9 +235,9 @@
   const I18N = {
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
-      map:"Mapa 1 (PNG) *", map2:"Mapa 2 (PNG)", map3:"Mapa 3 (PNG)", hintMulti:"(Opcional) Enganxa Mapes 2 i 3 per fer composició de 3 mapes, o envia-ho via payload.", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
+      map:"Mapa (PNG) *", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
-      legend:"Llegenda", dragLegend:"Moure llegenda", north:"Nord", scale:"Escala", footer:"Peu",
+      legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
       palette:"Paleta (hex separats per coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Amplada escala (px)",
@@ -243,9 +250,9 @@
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
-      map:"Mapa 1 (PNG) *", map2:"Mapa 2 (PNG)", map3:"Mapa 3 (PNG)", hintMulti:"(Opcional) Pega Mapas 2 y 3 para composición de 3 mapas, o envíalo vía payload.", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
+      map:"Mapa (PNG) *", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
-      legend:"Leyenda", dragLegend:"Mover leyenda", north:"Norte", scale:"Escala", footer:"Pie",
+      legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
       palette:"Paleta (hex separados por coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Ancho escala (px)",
@@ -258,8 +265,8 @@
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
-      map:"Map 1 (PNG) *", map2:"Map 2 (PNG)", map3:"Map 3 (PNG)", hintMulti:"(Optional) Paste Maps 2 & 3 for a 3-map composition, or send via payload.", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
-      legend:"Legend", dragLegend:"Drag legend", north:"North", scale:"Scale", footer:"Footer",
+      map:"Map (PNG) *", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
+      legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
       adv:"Details", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
       palette:"Palette (hex, comma-separated)", scaleKm:"Scale (km) (if enabled)", scalePx:"Scale width (px)",
@@ -281,9 +288,10 @@
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
-    if($("labMap2")) $("labMap2").textContent = t("map2");
-    if($("labMap3")) $("labMap3").textContent = t("map3");
-    if($("hintMulti")) $("hintMulti").textContent = t("hintMulti");
+    if($("labMap2")) $("labMap2").textContent = t("map") + " 2";
+    if($("labMap3")) $("labMap3").textContent = t("map") + " 3";
+    if($("labLegendDrag")) $("labLegendDrag").textContent = (LANG==="ca"?"Moure llegenda (arrossegar)":(LANG==="es"?"Mover leyenda (arrastrar)":"Move legend (drag)"));
+
     $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
@@ -309,7 +317,6 @@
     setSideOptionLabels();
 
     $("togLegend").textContent = t("legend");
-    if($("togDragLegend")) $("togDragLegend").textContent = t("dragLegend");
     $("togNorth").textContent = t("north");
     $("togScale").textContent = t("scale");
     $("togFooter").textContent = t("footer");
@@ -400,7 +407,28 @@
     ctx.fillText("N",0,-size*1.08);
     ctx.restore();
   }
-  function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
+  
+  function drawMapLabel(ctx,label,x,y,w,h,S){
+    ctx.save();
+    const pad = Math.round(12*S);
+    ctx.font = "800 " + Math.round(22*S) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const boxW = Math.min(w*0.9, ctx.measureText(label).width + pad*4);
+    const boxH = Math.round(34*S);
+    const bx = x + w/2 - boxW/2;
+    const by = y + Math.round(10*S);
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = "#ffffff";
+    drawRoundedRect(ctx, bx, by, boxW, boxH, Math.round(14*S));
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#111";
+    ctx.fillText(label, x + w/2, by + Math.round(6*S));
+    ctx.restore();
+  }
+
+function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
@@ -459,7 +487,7 @@
 
   // ---------- payload / params ----------
   const initial = {
-    mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
+    mapUrl:"", mapUrl2:"", mapUrl3:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
     dims:null
@@ -481,16 +509,17 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        // Multi-map support (3 maps)
-        if(Array.isArray(payload.maps)){
-          window.__PAYLOAD_MAPS = payload.maps.slice(0,3);
-        } else {
-          window.__PAYLOAD_MAPS = null;
-        }
-        if(Array.isArray(payload.labels)){
-          window.__PAYLOAD_LABELS = payload.labels.slice(0,3);
-        } else {
-          window.__PAYLOAD_LABELS = null;
+        // Support multi-map payloads (3 maps): payload.maps = [{dataUrl|mapUrl|url}, ...]
+        if (Array.isArray(payload.maps) && payload.maps.length) {
+          const getU = (o) => {
+            if(!o) return '';
+            if(typeof o === 'string') return o;
+            return o.dataUrl || o.mapUrl || o.map || o.url || '';
+          };
+          initial.mapUrl  = getU(payload.maps[0]) || initial.mapUrl;
+          initial.mapUrl2 = getU(payload.maps[1]);
+          initial.mapUrl3 = getU(payload.maps[2]);
+          // If the launcher also provides labels, keep them in DOM (render reads from qs('p'))
         }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
@@ -540,6 +569,8 @@
     initial.footer = qs("footer") || "";
 
     setIf("mapUrl", initial.mapUrl);
+    setIf("mapUrl2", initial.mapUrl2);
+    setIf("mapUrl3", initial.mapUrl3);
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
     setIf("vmin", initial.vmin);
@@ -556,80 +587,6 @@
   // ---------- render ----------
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
-
-  // ---------- draggable legend state ----------
-  let LEGEND_POS = null;
-  let LAST_LEGEND_BOX = null;
-  let LEGEND_DRAGGING = false;
-  let LEGEND_DRAG_OFFSET = {x:0, y:0};
-  let LEGEND_DRAG_INITED = false;
-
-  function clamp(v, a, b){
-    v = Number(v);
-    if(!isFinite(v)) return a;
-    return Math.max(a, Math.min(b, v));
-  }
-
-  function pointerPos(evt){
-    const r = canvas.getBoundingClientRect();
-    const cx = (evt.clientX !== undefined) ? evt.clientX : (evt.touches && evt.touches[0] ? evt.touches[0].clientX : 0);
-    const cy = (evt.clientY !== undefined) ? evt.clientY : (evt.touches && evt.touches[0] ? evt.touches[0].clientY : 0);
-    return {x: cx - r.left, y: cy - r.top};
-  }
-
-  function hitLegend(p){
-    if(!LAST_LEGEND_BOX) return false;
-    return (p.x >= LAST_LEGEND_BOX.x && p.x <= LAST_LEGEND_BOX.x + LAST_LEGEND_BOX.w &&
-            p.y >= LAST_LEGEND_BOX.y && p.y <= LAST_LEGEND_BOX.y + LAST_LEGEND_BOX.h);
-  }
-
-  function initLegendDrag(){
-    if(LEGEND_DRAG_INITED) return;
-    LEGEND_DRAG_INITED = true;
-
-    function onDown(evt){
-      const dragLegend = ($("dragLegend") && $("dragLegend").checked);
-      const showLegend = ($("showLegend") && $("showLegend").checked);
-      if(!dragLegend || !showLegend) return;
-      const p = pointerPos(evt);
-      if(!hitLegend(p)) return;
-      evt.preventDefault();
-      LEGEND_DRAGGING = true;
-      if(!LEGEND_POS && LAST_LEGEND_BOX){
-        LEGEND_POS = {x: LAST_LEGEND_BOX.x, y: LAST_LEGEND_BOX.y};
-      }
-      LEGEND_DRAG_OFFSET.x = p.x - (LEGEND_POS ? LEGEND_POS.x : 0);
-      LEGEND_DRAG_OFFSET.y = p.y - (LEGEND_POS ? LEGEND_POS.y : 0);
-    }
-
-    function onMove(evt){
-      if(!LEGEND_DRAGGING) return;
-      const p = pointerPos(evt);
-      evt.preventDefault();
-      if(!LAST_LEGEND_BOX) return;
-
-      const minX = LAST_LEGEND_BOX.mapX + LAST_LEGEND_BOX.margin;
-      const maxX = LAST_LEGEND_BOX.mapX + LAST_LEGEND_BOX.mapW - LAST_LEGEND_BOX.w - LAST_LEGEND_BOX.margin;
-      const minY = LAST_LEGEND_BOX.mapY + LAST_LEGEND_BOX.margin;
-      const maxY = LAST_LEGEND_BOX.mapY + LAST_LEGEND_BOX.mapH - LAST_LEGEND_BOX.h - LAST_LEGEND_BOX.margin;
-
-      LEGEND_POS.x = clamp(p.x - LEGEND_DRAG_OFFSET.x, minX, maxX);
-      LEGEND_POS.y = clamp(p.y - LEGEND_DRAG_OFFSET.y, minY, maxY);
-
-      requestAnimationFrame(()=>{ render(); });
-    }
-
-    function onUp(){ LEGEND_DRAGGING = false; }
-
-    canvas.addEventListener("pointerdown", onDown, {passive:false});
-    window.addEventListener("pointermove", onMove, {passive:false});
-    window.addEventListener("pointerup", onUp, {passive:true});
-    canvas.addEventListener("touchstart", onDown, {passive:false});
-    window.addEventListener("touchmove", onMove, {passive:false});
-    window.addEventListener("touchend", onUp, {passive:true});
-  }
-
-
 
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
@@ -736,44 +693,83 @@
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
-            // Map URL(s): support single map and 3-map compositions
-      const mapUrl1 = ($("mapUrl").value||"").trim();
-      const mapUrl2 = ($("mapUrl2") ? ($("mapUrl2").value||"").trim() : "");
-      const mapUrl3 = ($("mapUrl3") ? ($("mapUrl3").value||"").trim() : "");
-
-      let mapUrls = [];
-      if(window.__PAYLOAD_MAPS && Array.isArray(window.__PAYLOAD_MAPS)){
-        mapUrls = window.__PAYLOAD_MAPS.map(u=>String(u||"").trim()).filter(Boolean).slice(0,3);
-      } else {
-        mapUrls = [mapUrl1, mapUrl2, mapUrl3].filter(Boolean);
-      }
-
-      if(!mapUrls.length){
+      let mapUrl = ($("mapUrl").value||"").trim();
+      let mapUrl2 = ($("mapUrl2")? ($("mapUrl2").value||"").trim() : "");
+      let mapUrl3 = ($("mapUrl3")? ($("mapUrl3").value||"").trim() : "");
+      const payloadForLabels = (function(){
+        const p = qs("p");
+        if(!p) return null;
+        try { return JSON.parse(p); } catch(e1) {
+          try { return JSON.parse(decodeURIComponent(p)); } catch(e2) {
+            try { return JSON.parse(atob(p)); } catch(e3) {
+              try { return JSON.parse(atob(decodeURIComponent(p))); } catch(e4) { return null; }
+            }
+          }
+        }
+      })();
+      const mapLabels = (payloadForLabels && Array.isArray(payloadForLabels.labels)) ? payloadForLabels.labels : null;
+      if(!mapUrl){
         setErr(t("missingMap"));
         return;
       }
 
-      const mapLabels = (window.__PAYLOAD_LABELS && Array.isArray(window.__PAYLOAD_LABELS)) ? window.__PAYLOAD_LABELS : [];
+    const posterW = parseInt($("posterW").value,10) || 3200;
+    let S = posterW / 2400;
+    S = Math.max(1.0, Math.min(2.0, S));
 
-      async function loadOne(url){
-        let u = expandThumbUrl(url, 0.10);
-        try{ return await loadImage(u, true); }
-        catch(_e1){
-          try{ return await loadImage(u, false); }
-          catch(_e2){ throw new Error("img_load_fail"); }
-        }
-      }
+    let pad = parseInt($("padPx").value,10) || 60;
+    pad = Math.round(pad * S);
 
-      // load map(s)
-      let imgs=[];
-      try{
-        imgs = await Promise.all(mapUrls.map(loadOne));
-      }catch(_e){
-        setErr(t("loadFail"));
+    const title = ($("title").value||"").trim() || "Pòster";
+    const subtitle = ($("subtitle").value||"").trim();
+    const vmin = (($("vmin") && $("vmin").value) || "").trim();
+    const vmax = (($("vmax") && $("vmax").value) || "").trim();
+    const unit = ($("unit").value||"").trim();
+    const palette = parsePalette(($("palette").value||"").trim());
+    const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
+    let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
+    if(!isFinite(scalePx) || scalePx<=0) scalePx=180;
+    scalePx = Math.round(scalePx * S);
+
+    const footer = (($("footer") && $("footer").value) || "").trim();
+
+    const showLegend = $("showLegend").checked;
+    const showNorth  = $("showNorth").checked;
+    const showScale  = $("showScale").checked;
+    const showFooter = $("showFooter").checked;
+
+    // poster aspect ratio
+    const outW = posterW;
+    const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
+    const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
+    const outH = Math.round(outW * ratio);
+    setCanvasSize(outW,outH);
+
+      // load map(s) (try with CORS, fallback without)
+      const urls = [mapUrl, mapUrl2, mapUrl3].map(u => (u||"").trim());
+      const hasMulti = (urls[1] || urls[2]);
+      // If multi mode, require 3 URLs (the visor always sends 3)
+      if(hasMulti && (!urls[0] || !urls[1] || !urls[2])){
+        setErr('Falten URLs de mapa (2 o 3).');
         return;
       }
+      const useUrls = hasMulti ? urls : [urls[0]];
+      const imgs = [];
+      for(let i=0;i<useUrls.length;i++){
+        let u = expandThumbUrl(useUrls[i], 0.10);
+        let im = null;
+        try{ im = await loadImage(u, true); }
+        catch(_e1){
+          try{ im = await loadImage(u, false); }
+          catch(_e2){
+            setErr(t('loadFail') + ' (Mapa ' + (i+1) + ')');
+            return;
+          }
+        }
+        imgs.push(im);
+      }
 
-const W=outW, H=outH;
+    const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
@@ -823,119 +819,105 @@ const W=outW, H=outH;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // Map drawing (single map or 3-map layout)
-    const ZOOM = 1.12;
-
-    function drawOneMap(img, rx, ry, rw, rh, label){
-      const insetLocal = Math.round(14*S);
-      const innerRX = rx + insetLocal;
-      const innerRY = ry + insetLocal;
-      const innerRW = rw - insetLocal*2;
-      const innerRH = rh - insetLocal*2;
-
-      const ar = img.width / img.height;
-      const targetAr = innerRW / innerRH;
-      let drawW, drawH, dx, dy;
-
-      if(ar > targetAr){
-        drawW = innerRW;
-        drawH = innerRW / ar;
-        dx = innerRX;
-        dy = innerRY + (innerRH - drawH)/2;
-      } else {
-        drawH = innerRH;
-        drawW = innerRH * ar;
-        dx = innerRX + (innerRW - drawW)/2;
-        dy = innerRY;
-      }
-
-      const cx = dx + drawW/2;
-      const cy = dy + drawH/2;
-      drawW = drawW * ZOOM;
-      drawH = drawH * ZOOM;
-      dx = cx - drawW/2;
-      dy = cy - drawH/2;
-
-      ctx.fillStyle = "#ffffff";
-      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
-      ctx.fill();
-      ctx.strokeStyle="rgba(0,0,0,0.12)";
-      ctx.lineWidth=Math.max(1,Math.round(2*S));
-      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
-      ctx.stroke();
-
-      ctx.save();
-      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
-      ctx.clip();
-      ctx.drawImage(img, dx, dy, drawW, drawH);
-      ctx.restore();
-
-      if(label){
-        ctx.save();
-        ctx.fillStyle="rgba(255,255,255,.92)";
-        const lh = Math.round(40*S);
-        const lw = Math.min(rw - Math.round(16*S), Math.round(520*S));
-        const lx = rx + Math.round(10*S);
-        const ly = ry + Math.round(10*S);
-        drawRoundedRect(ctx, lx, ly, lw, lh, Math.round(14*S));
-        ctx.fill();
-        ctx.strokeStyle="rgba(0,0,0,0.10)";
-        ctx.lineWidth=Math.max(1,Math.round(2*S));
-        drawRoundedRect(ctx, lx, ly, lw, lh, Math.round(14*S));
-        ctx.stroke();
-        ctx.fillStyle="#111";
-        ctx.font="900 "+Math.round(20*S)+"px system-ui, sans-serif";
-        ctx.textAlign="left";
-        ctx.textBaseline="middle";
-        ctx.fillText(String(label).slice(0,40), lx+Math.round(14*S), ly+lh/2);
-        ctx.restore();
-      }
-
-      return {drawW, drawH, dx, dy};
+    // aspect fit map
+    const ar = imgs[0].width / imgs[0].height;
+    const targetAr = innerW / innerH;
+    let drawW, drawH, dx, dy;
+    if(ar > targetAr){
+      drawW = innerW;
+      drawH = innerW / ar;
+      dx = innerX;
+      dy = innerY + (innerH - drawH)/2;
+    } else {
+      drawH = innerH;
+      drawW = innerH * ar;
+      dx = innerX + (innerW - drawW)/2;
+      dy = innerY;
     }
 
-    // container frame
+    // frame + clip
+
+    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
+    // keep a subtle rounded frame + border only
     ctx.fillStyle = "#cfe8f3";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
+
     ctx.strokeStyle="rgba(0,0,0,0.12)";
     ctx.lineWidth=Math.max(1,Math.round(2*S));
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
-    let firstDrawW = null;
+    // Slight zoom-in (a bit less "far away") without changing the bbox in GEE
+    const ZOOM = 1.12;
+    const cx = dx + drawW/2;
+    const cy = dy + drawH/2;
+    drawW = drawW * ZOOM;
+    drawH = drawH * ZOOM;
+    dx = cx - drawW/2;
+    dy = cy - drawH/2;
 
-    if(imgs.length >= 3){
-      const gap = Math.round(18*S);
-      const arSel2 = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
-      const isLand = (arSel2==="a4_land");
+    ctx.save();
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
+    if(imgs.length===1){
+      ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
+    } else {
+      // 3-map layout inside the same frame
+      const isLand = (posterAR==="a4_land");
+      const gapIn = Math.round(14*S);
       if(isLand){
-        const cellW = (innerW - gap*2) / 3;
+        const slotW = (innerW - gapIn*2)/3;
         for(let i=0;i<3;i++){
-          const rx = innerX + i*(cellW + gap);
-          const ry = innerY;
-          const rw = cellW;
-          const rh = innerH;
-          const r = drawOneMap(imgs[i], rx, ry, rw, rh, mapLabels[i] || "");
-          if(i===0) firstDrawW = r.drawW;
+          const sx = innerX + i*(slotW + gapIn);
+          const sy = innerY;
+          const sw = slotW;
+          const sh = innerH;
+          const im = imgs[i];
+          const arS = im.width / im.height;
+          const tar = sw/sh;
+          let dW, dH, dX, dY;
+          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
+          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
+          const Z=1.12;
+          const cX=dX+dW/2, cY=dY+dH/2;
+          dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
+          ctx.save();
+          ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+          ctx.drawImage(im, dX, dY, dW, dH);
+          ctx.restore();
+          // label
+          const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
+          drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
         }
       } else {
-        const cellH = (innerH - gap*2) / 3;
+        const slotH = (innerH - gapIn*2)/3;
         for(let i=0;i<3;i++){
-          const rx = innerX;
-          const ry = innerY + i*(cellH + gap);
-          const rw = innerW;
-          const rh = cellH;
-          const r = drawOneMap(imgs[i], rx, ry, rw, rh, mapLabels[i] || "");
-          if(i===0) firstDrawW = r.drawW;
+          const sx = innerX;
+          const sy = innerY + i*(slotH + gapIn);
+          const sw = innerW;
+          const sh = slotH;
+          const im = imgs[i];
+          const arS = im.width / im.height;
+          const tar = sw/sh;
+          let dW, dH, dX, dY;
+          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
+          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
+          const Z=1.12;
+          const cX=dX+dW/2, cY=dY+dH/2;
+          dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
+          ctx.save();
+          ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+          ctx.drawImage(im, dX, dY, dW, dH);
+          ctx.restore();
+          const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
+          drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
         }
       }
-    } else {
-      const r = drawOneMap(imgs[0], mapX, mapY, mapW, mapH, mapLabels[0] || "");
-      firstDrawW = r.drawW;
     }
-
-// overlays
+    ctx.restore();
+    // overlays
+    // overlays
     const legendSide = ($("legendSide")? $("legendSide").value : "right");
     const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
 
@@ -951,7 +933,7 @@ const W=outW, H=outH;
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
           // Use the actual drawn map width (drawW) to compute km/px
-          const kmPerPx = bboxWidthKm / Math.max(1, (firstDrawW||1));
+          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
           const targetKm = kmPerPx * scalePx;
           km = niceKm(targetKm);
           // keep the bar visually consistent: adjust pixels to match the chosen nice km
@@ -969,35 +951,30 @@ const W=outW, H=outH;
       const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
-      let legX = (legendSide==="left")
+      // Base position by side
+      const legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
+      // If scale is on and same side, stack legend above the scale bar
       let legY = mapY + mapH - legH - legMargin;
       if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S);
+        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
         const gap = Math.round(14*S);
         legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
       }
+      // Safety clamp (avoid going above the map)
       legY = Math.max(mapY + legMargin, legY);
 
-      const dragLegend = ($("dragLegend") && $("dragLegend").checked);
-
-      if(dragLegend){
-        if(!LEGEND_POS){ LEGEND_POS = {x: legX, y: legY}; }
-        const minX = mapX + legMargin;
-        const maxX = mapX + mapW - legW - legMargin;
-        const minY = mapY + legMargin;
-        const maxY = mapY + mapH - legH - legMargin;
-        LEGEND_POS.x = clamp(LEGEND_POS.x, minX, maxX);
-        LEGEND_POS.y = clamp(LEGEND_POS.y, minY, maxY);
-        legX = LEGEND_POS.x;
-        legY = LEGEND_POS.y;
-      } else {
-        LEGEND_POS = null;
+      // Draggable legend override
+      if(legendEnabled() && legendDragState.x!==null && legendDragState.y!==null){
+        legX = legendDragState.x;
+        legY = legendDragState.y;
+        // clamp inside map frame
+        legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
+        legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - legH - legMargin);
       }
-
-      LAST_LEGEND_BOX = {x: legX, y: legY, w: legW, h: legH, mapX, mapY, mapW, mapH, margin: legMargin};
+      setLegendRect(legX, legY, legW, legH);
 
       drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
@@ -1041,16 +1018,53 @@ const W=outW, H=outH;
   // wire
   $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
+  $("legendDrag").addEventListener("change", () => {
+    if(!$("legendDrag").checked){
+      legendDragState.x = null;
+      legendDragState.y = null;
+    }
+    if(($("mapUrl").value||"").trim()) render();
+  });
+
+
   $("btnReset").addEventListener("click", () => {
     loadFromQuery();
     setErr("");
     setStatus("");
   });
+  // Legend dragging (only when enabled)
+  function canvasPos(ev){
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * (canvas.width / r.width);
+    const y = (ev.clientY - r.top) * (canvas.height / r.height);
+    return {x,y};
+  }
+  canvas.addEventListener("mousedown", (ev) => {
+    if(!legendEnabled()) return;
+    const p = canvasPos(ev);
+    const lx=legendDragState.x, ly=legendDragState.y, lw=legendDragState.w, lh=legendDragState.h;
+    if(lx===null||ly===null) return;
+    if(p.x>=lx && p.x<=lx+lw && p.y>=ly && p.y<=ly+lh){
+      legendDragState.dragging=true;
+      legendDragState.dx = p.x - lx;
+      legendDragState.dy = p.y - ly;
+      ev.preventDefault();
+    }
+  });
+  window.addEventListener("mousemove", (ev) => {
+    if(!legendDragState.dragging) return;
+    const p = canvasPos(ev);
+    legendDragState.x = p.x - legendDragState.dx;
+    legendDragState.y = p.y - legendDragState.dy;
+    render();
+  });
+  window.addEventListener("mouseup", () => { legendDragState.dragging=false; });
+
+
 
   // init
   applyLang();
   loadFromQuery();
-  initLegendDrag();
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
 </script>
