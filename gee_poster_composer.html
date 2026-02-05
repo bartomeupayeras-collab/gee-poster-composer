@@ -68,11 +68,6 @@
       border-radius: var(--radius);
       display:block;
     }
-
-    /* Drag legend helper */
-    canvas.dragLegend{ cursor: grab; }
-    canvas.dragLegend.dragging{ cursor: grabbing; }
-
   </style>
 </head>
 <body>
@@ -111,19 +106,19 @@
       <div class="pad">
         <label id="labMap"></label>
         <input id="mapUrl" placeholder="" />
-
-        
+        <div class="hint" style="margin-top:6px" id="hintMulti"></div>
         <div class="row" style="margin-top:10px">
           <div style="flex:1">
-            <label id="labMap2" style="margin-top:0"></label>
+            <label id="labMap2"></label>
             <input id="mapUrl2" placeholder="" />
           </div>
           <div style="flex:1">
-            <label id="labMap3" style="margin-top:0"></label>
+            <label id="labMap3"></label>
             <input id="mapUrl3" placeholder="" />
           </div>
         </div>
-<div class="row">
+
+        <div class="row">
           <div style="flex:1">
             <label id="labPosterAR"></label>
             <select id="posterAR">
@@ -152,7 +147,7 @@
 
         <div class="pillbar">
           <label class="pill"><input type="checkbox" id="showLegend" checked> <span id="togLegend"></span></label>
-          <label class="pill"><input type="checkbox" id="legendFree"> <span id="togLegendFree"></span></label>
+          <label class="pill"><input type="checkbox" id="dragLegend"> <span id="togDragLegend"></span></label>
           <label class="pill"><input type="checkbox" id="showNorth" checked> <span id="togNorth"></span></label>
           <label class="pill"><input type="checkbox" id="showScale"> <span id="togScale"></span></label>
           <label class="pill"><input type="checkbox" id="showFooter" checked> <span id="togFooter"></span></label>
@@ -233,12 +228,9 @@
   const I18N = {
     ca: {
       reset:"Recarregar", render:"Generar", download:"Descarregar PNG",
-      map:"Mapa (PNG) *",
-      map2:"Mapa 2 (PNG) (opcional)",
-      map3:"Mapa 3 (PNG) (opcional)",
-      legendFree:"Moure llegenda (arrossegar)", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
+      map:"Mapa 1 (PNG) *", map2:"Mapa 2 (PNG)", map3:"Mapa 3 (PNG)", hintMulti:"(Opcional) Enganxa Mapes 2 i 3 per fer composició de 3 mapes, o envia-ho via payload.", posterAR:"Format", posterW:"Amplada pòster", pad:"Marge intern",
       legendPos:"Posició llegenda", scalePos:"Posició escala",
-      legend:"Llegenda", north:"Nord", scale:"Escala", footer:"Peu",
+      legend:"Llegenda", dragLegend:"Moure llegenda", north:"Nord", scale:"Escala", footer:"Peu",
       adv:"Detalls", advSub:"",
       title:"Títol", subtitle:"Subtítol (1–3 línies)", min:"Min", max:"Max", unit:"Unitat",
       palette:"Paleta (hex separats per coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Amplada escala (px)",
@@ -251,12 +243,9 @@
     },
     es: {
       reset:"Recargar", render:"Generar", download:"Descargar PNG",
-      map:"Mapa (PNG) *",
-      map2:"Mapa 2 (PNG) (opcional)",
-      map3:"Mapa 3 (PNG) (opcional)",
-      legendFree:"Mover leyenda (arrastrar)", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
+      map:"Mapa 1 (PNG) *", map2:"Mapa 2 (PNG)", map3:"Mapa 3 (PNG)", hintMulti:"(Opcional) Pega Mapas 2 y 3 para composición de 3 mapas, o envíalo vía payload.", posterAR:"Formato", posterW:"Ancho póster", pad:"Margen interno",
       legendPos:"Posición leyenda", scalePos:"Posición escala",
-      legend:"Leyenda", north:"Norte", scale:"Escala", footer:"Pie",
+      legend:"Leyenda", dragLegend:"Mover leyenda", north:"Norte", scale:"Escala", footer:"Pie",
       adv:"Detalles", advSub:"",
       title:"Título", subtitle:"Subtítulo (1–3 líneas)", min:"Mín", max:"Máx", unit:"Unidad",
       palette:"Paleta (hex separados por coma)", scaleKm:"Escala (km) (si activada)", scalePx:"Ancho escala (px)",
@@ -269,11 +258,8 @@
     },
     en: {
       reset:"Reload", render:"Generate", download:"Download PNG",
-      map:"Map (PNG) *",
-      map2:"Map 2 (PNG) (optional)",
-      map3:"Map 3 (PNG) (optional)",
-      legendFree:"Move legend (drag)", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
-      legend:"Legend", north:"North", scale:"Scale", footer:"Footer",
+      map:"Map 1 (PNG) *", map2:"Map 2 (PNG)", map3:"Map 3 (PNG)", hintMulti:"(Optional) Paste Maps 2 & 3 for a 3-map composition, or send via payload.", posterAR:"Format", posterW:"Poster width", pad:"Inner margin",
+      legend:"Legend", dragLegend:"Drag legend", north:"North", scale:"Scale", footer:"Footer",
       adv:"Details", advSub:"",
       title:"Title", subtitle:"Subtitle (1–3 lines)", min:"Min", max:"Max", unit:"Unit",
       palette:"Palette (hex, comma-separated)", scaleKm:"Scale (km) (if enabled)", scalePx:"Scale width (px)",
@@ -297,6 +283,7 @@
     $("labMap").textContent = t("map");
     if($("labMap2")) $("labMap2").textContent = t("map2");
     if($("labMap3")) $("labMap3").textContent = t("map3");
+    if($("hintMulti")) $("hintMulti").textContent = t("hintMulti");
     $("labPosterAR").textContent = t("posterAR");
     $("labPosterW").textContent = t("posterW");
     $("labPad").textContent = t("pad");
@@ -322,7 +309,7 @@
     setSideOptionLabels();
 
     $("togLegend").textContent = t("legend");
-    if($("togLegendFree")) $("togLegendFree").textContent = t("legendFree");
+    if($("togDragLegend")) $("togDragLegend").textContent = t("dragLegend");
     $("togNorth").textContent = t("north");
     $("togScale").textContent = t("scale");
     $("togFooter").textContent = t("footer");
@@ -472,13 +459,10 @@
 
   // ---------- payload / params ----------
   const initial = {
-    mapUrl:"", mapUrl2:"", mapUrl3:"", maps:[], labels:[],
-    title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
+    mapUrl:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
-    dims:null,
-    // legend position (relative to the full map area). If null, use side presets.
-    legendPos:null
+    dims:null
   };
 
   function loadFromQuery(){
@@ -497,23 +481,17 @@
           }
         }
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
-        // Support 3 maps payload: payload.maps = [{dataUrl},...], payload.labels = [..]
-        if(Array.isArray(payload.maps) && payload.maps.length){
-          initial.maps = payload.maps.map(m => {
-            if(typeof m === "string") return m;
-            if(m && (m.dataUrl || m.mapUrl || m.url)) return (m.dataUrl || m.mapUrl || m.url);
-            return "";
-          }).filter(Boolean);
-          if(initial.maps[0]) initial.mapUrl = initial.maps[0];
-          if(initial.maps[1]) initial.mapUrl2 = initial.maps[1];
-          if(initial.maps[2]) initial.mapUrl3 = initial.maps[2];
+        // Multi-map support (3 maps)
+        if(Array.isArray(payload.maps)){
+          window.__PAYLOAD_MAPS = payload.maps.slice(0,3);
+        } else {
+          window.__PAYLOAD_MAPS = null;
         }
-        if(Array.isArray(payload.labels)) initial.labels = payload.labels.slice(0,3).map(sanitize);
-        // Optional: saved legend position
-        if(payload.legendPos && isFinite(payload.legendPos.x) && isFinite(payload.legendPos.y)){
-          initial.legendPos = {x:Number(payload.legendPos.x), y:Number(payload.legendPos.y)};
+        if(Array.isArray(payload.labels)){
+          window.__PAYLOAD_LABELS = payload.labels.slice(0,3);
+        } else {
+          window.__PAYLOAD_LABELS = null;
         }
-
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
           initial.bbox = payload.bbox;
@@ -551,8 +529,6 @@
     }
 
     if(!initial.mapUrl) initial.mapUrl = qs("map") || qs("mapUrl") || qs("url") || qs("dataUrl") || "";
-    if(!initial.mapUrl2) initial.mapUrl2 = qs("map2") || qs("mapUrl2") || "";
-    if(!initial.mapUrl3) initial.mapUrl3 = qs("map3") || qs("mapUrl3") || "";
     if(!initial.title) initial.title = qs("title") || initial.title;
     if(!initial.subtitle) initial.subtitle = qs("subtitle") || initial.subtitle;
     if(!initial.vmin) initial.vmin = qs("min") || "";
@@ -564,10 +540,6 @@
     initial.footer = qs("footer") || "";
 
     setIf("mapUrl", initial.mapUrl);
-    setIf("mapUrl2", initial.mapUrl2);
-    setIf("mapUrl3", initial.mapUrl3);
-    // If payload included legendPos, enable free legend mode by default
-    if(initial.legendPos && $("legendFree")) $("legendFree").checked = true;
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
     setIf("vmin", initial.vmin);
@@ -584,6 +556,80 @@
   // ---------- render ----------
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
+
+  // ---------- draggable legend state ----------
+  let LEGEND_POS = null;
+  let LAST_LEGEND_BOX = null;
+  let LEGEND_DRAGGING = false;
+  let LEGEND_DRAG_OFFSET = {x:0, y:0};
+  let LEGEND_DRAG_INITED = false;
+
+  function clamp(v, a, b){
+    v = Number(v);
+    if(!isFinite(v)) return a;
+    return Math.max(a, Math.min(b, v));
+  }
+
+  function pointerPos(evt){
+    const r = canvas.getBoundingClientRect();
+    const cx = (evt.clientX !== undefined) ? evt.clientX : (evt.touches && evt.touches[0] ? evt.touches[0].clientX : 0);
+    const cy = (evt.clientY !== undefined) ? evt.clientY : (evt.touches && evt.touches[0] ? evt.touches[0].clientY : 0);
+    return {x: cx - r.left, y: cy - r.top};
+  }
+
+  function hitLegend(p){
+    if(!LAST_LEGEND_BOX) return false;
+    return (p.x >= LAST_LEGEND_BOX.x && p.x <= LAST_LEGEND_BOX.x + LAST_LEGEND_BOX.w &&
+            p.y >= LAST_LEGEND_BOX.y && p.y <= LAST_LEGEND_BOX.y + LAST_LEGEND_BOX.h);
+  }
+
+  function initLegendDrag(){
+    if(LEGEND_DRAG_INITED) return;
+    LEGEND_DRAG_INITED = true;
+
+    function onDown(evt){
+      const dragLegend = ($("dragLegend") && $("dragLegend").checked);
+      const showLegend = ($("showLegend") && $("showLegend").checked);
+      if(!dragLegend || !showLegend) return;
+      const p = pointerPos(evt);
+      if(!hitLegend(p)) return;
+      evt.preventDefault();
+      LEGEND_DRAGGING = true;
+      if(!LEGEND_POS && LAST_LEGEND_BOX){
+        LEGEND_POS = {x: LAST_LEGEND_BOX.x, y: LAST_LEGEND_BOX.y};
+      }
+      LEGEND_DRAG_OFFSET.x = p.x - (LEGEND_POS ? LEGEND_POS.x : 0);
+      LEGEND_DRAG_OFFSET.y = p.y - (LEGEND_POS ? LEGEND_POS.y : 0);
+    }
+
+    function onMove(evt){
+      if(!LEGEND_DRAGGING) return;
+      const p = pointerPos(evt);
+      evt.preventDefault();
+      if(!LAST_LEGEND_BOX) return;
+
+      const minX = LAST_LEGEND_BOX.mapX + LAST_LEGEND_BOX.margin;
+      const maxX = LAST_LEGEND_BOX.mapX + LAST_LEGEND_BOX.mapW - LAST_LEGEND_BOX.w - LAST_LEGEND_BOX.margin;
+      const minY = LAST_LEGEND_BOX.mapY + LAST_LEGEND_BOX.margin;
+      const maxY = LAST_LEGEND_BOX.mapY + LAST_LEGEND_BOX.mapH - LAST_LEGEND_BOX.h - LAST_LEGEND_BOX.margin;
+
+      LEGEND_POS.x = clamp(p.x - LEGEND_DRAG_OFFSET.x, minX, maxX);
+      LEGEND_POS.y = clamp(p.y - LEGEND_DRAG_OFFSET.y, minY, maxY);
+
+      requestAnimationFrame(()=>{ render(); });
+    }
+
+    function onUp(){ LEGEND_DRAGGING = false; }
+
+    canvas.addEventListener("pointerdown", onDown, {passive:false});
+    window.addEventListener("pointermove", onMove, {passive:false});
+    window.addEventListener("pointerup", onUp, {passive:true});
+    canvas.addEventListener("touchstart", onDown, {passive:false});
+    window.addEventListener("touchmove", onMove, {passive:false});
+    window.addEventListener("touchend", onUp, {passive:true});
+  }
+
+
 
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
@@ -684,111 +730,58 @@
     return m*p;
   }
 
-  
-  // ---------- image cache (avoid reloading on small edits like legend drag) ----------
-  const _imgCache = new Map();
-  async function getImageCached(url){
-    const key = String(url||"").trim();
-    if(!key) return null;
-    if(_imgCache.has(key)) return _imgCache.get(key);
-    const prom = (async ()=>{
-      let u = expandThumbUrl(key, 0.10);
-      try{ return await loadImage(u, true); }
-      catch(_e1){
-        return await loadImage(u, false);
-      }
-    })();
-    _imgCache.set(key, prom);
-    return prom;
-  }
-
-  // Keep last legend rect to support drag interaction
-  let _lastLegendRect = null;   // {x,y,w,h} in canvas px
-  let _lastLegendArea = null;   // {x,y,w,h} clamp area in canvas px
-  let _isDraggingLegend = false;
-  let _dragOff = {x:0,y:0};
-
-  // Legend position in [0..1] relative to full map area (top-left)
-  let _legendPos = null; // {x:0..1,y:0..1}
-  let _rendering = false;
-  let _renderPending = false;
-
   async function render(){
-    if(_rendering){ _renderPending = true; return; }
-    _rendering = true;
     setErr("");
     $("btnRender").disabled=true;
     setStatus('<span class="spin"></span>'+t("generating"));
 
     try{
-      // --- gather inputs ---
-      const url1 = ($("mapUrl").value||"").trim();
-      const url2 = ($("mapUrl2").value||"").trim();
-      const url3 = ($("mapUrl3").value||"").trim();
-      const mapUrls = [url1, url2, url3].filter(Boolean);
-      const isThree = (mapUrls.length >= 3);
+            // Map URL(s): support single map and 3-map compositions
+      const mapUrl1 = ($("mapUrl").value||"").trim();
+      const mapUrl2 = ($("mapUrl2") ? ($("mapUrl2").value||"").trim() : "");
+      const mapUrl3 = ($("mapUrl3") ? ($("mapUrl3").value||"").trim() : "");
 
-      if(!url1){
+      let mapUrls = [];
+      if(window.__PAYLOAD_MAPS && Array.isArray(window.__PAYLOAD_MAPS)){
+        mapUrls = window.__PAYLOAD_MAPS.map(u=>String(u||"").trim()).filter(Boolean).slice(0,3);
+      } else {
+        mapUrls = [mapUrl1, mapUrl2, mapUrl3].filter(Boolean);
+      }
+
+      if(!mapUrls.length){
         setErr(t("missingMap"));
         return;
       }
 
-      const posterW = parseInt($("posterW").value,10) || 3200;
-      let S = posterW / 2400;
-      S = Math.max(1.0, Math.min(2.0, S));
+      const mapLabels = (window.__PAYLOAD_LABELS && Array.isArray(window.__PAYLOAD_LABELS)) ? window.__PAYLOAD_LABELS : [];
 
-      let pad = parseInt($("padPx").value,10) || 60;
-      pad = Math.round(pad * S);
-
-      const title = ($("title").value||"").trim() || "Pòster";
-      const subtitle = ($("subtitle").value||"").trim();
-      const vmin = (($("vmin") && $("vmin").value) || "").trim();
-      const vmax = (($("vmax") && $("vmax").value) || "").trim();
-      const unit = ($("unit").value||"").trim();
-      const palette = parsePalette(($("palette").value||"").trim());
-      const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
-      let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
-      if(!isFinite(scalePx) || scalePx<=0) scalePx=180;
-      scalePx = Math.round(scalePx * S);
-
-      const footer = (($("footer") && $("footer").value) || "").trim();
-
-      const showLegend = $("showLegend").checked;
-      const legendFree = $("legendFree") ? $("legendFree").checked : false;
-      const showNorth  = $("showNorth").checked;
-      const showScale  = $("showScale").checked;
-      const showFooter = $("showFooter").checked;
-
-      // poster aspect ratio
-      const outW = posterW;
-      const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
-      const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
-      const outH = Math.round(outW * ratio);
-      setCanvasSize(outW,outH);
-
-      // --- load map images (cached) ---
-      let imgs = [];
-      try{
-        for(let i=0;i<(isThree?3:1);i++){
-          const u = isThree ? mapUrls[i] : url1;
-          const im = await getImageCached(u);
-          imgs.push(im);
+      async function loadOne(url){
+        let u = expandThumbUrl(url, 0.10);
+        try{ return await loadImage(u, true); }
+        catch(_e1){
+          try{ return await loadImage(u, false); }
+          catch(_e2){ throw new Error("img_load_fail"); }
         }
+      }
+
+      // load map(s)
+      let imgs=[];
+      try{
+        imgs = await Promise.all(mapUrls.map(loadOne));
       }catch(_e){
         setErr(t("loadFail"));
         return;
       }
 
-      // --- canvas base ---
-      const W=outW, H=outH;
-      ctx.clearRect(0,0,W,H);
-      ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
+const W=outW, H=outH;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
 
-      // header
-      const headerH = Math.round(260*S);
-      ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
-      ctx.strokeStyle="rgba(0,0,0,0.06)";
-      ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
+    // header
+    const headerH = Math.round(260*S);
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,headerH);
+    ctx.strokeStyle="rgba(0,0,0,0.06)";
+    ctx.beginPath(); ctx.moveTo(0,headerH); ctx.lineTo(W,headerH); ctx.stroke();
 
       // poster header (single brand logo + title/subtitle)
       const logoH = Math.round(120*S);
@@ -809,144 +802,159 @@
       if(subtitle){
         ctx.fillStyle = "#374151";
         ctx.font = "500 " + Math.round(32*S) + "px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-        const lines = subtitle.split("
-").slice(0,3);
+        const lines = subtitle.split("\n").slice(0,3);
         for(let i=0;i<lines.length;i++){
           ctx.fillText(lines[i], titleX, titleY + Math.round(66*S) + i*Math.round(36*S));
         }
         afterHeaderTextY = titleY + Math.round(66*S) + lines.length*Math.round(36*S);
       }
 
-      // map region (full area reserved for 1 or 3 maps)
+      // map frame region (start after header/text)
       const mapTop = Math.max(headerH, Math.round(afterHeaderTextY + 34*S));
-      const mapX = pad;
-      const mapY = mapTop;
-      const mapW = W - pad*2;
-      const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
+    const mapX = pad;
+    const mapY = mapTop;
+    const mapW = W - pad*2;
+    const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
 
-      // For 3 maps, reserve small label area on top of each map cell
-      const gap = Math.round(18*S);
-      const labelH = isThree ? Math.round(44*S) : 0;
+    // inner padding so the map content never touches the frame
+    const inset = Math.round(18*S);
+    const innerX = mapX + inset;
+    const innerY = mapY + inset;
+    const innerW = mapW - inset*2;
+    const innerH = mapH - inset*2;
 
-      // Build map frames
-      const frames = [];
-      if(isThree){
-        const horiz = (arSel === "a4_land"); // rule from your workflow: horizontal => 3 columns, vertical => stacked
-        if(horiz){
-          const cellW = Math.round((mapW - gap*2) / 3);
-          for(let i=0;i<3;i++){
-            const x = mapX + i*(cellW + gap);
-            frames.push({x, y: mapY, w: cellW, h: mapH, idx:i});
-          }
-        }else{
-          const cellH = Math.round((mapH - gap*2) / 3);
-          for(let i=0;i<3;i++){
-            const y = mapY + i*(cellH + gap);
-            frames.push({x: mapX, y, w: mapW, h: cellH, idx:i});
-          }
-        }
-      }else{
-        frames.push({x: mapX, y: mapY, w: mapW, h: mapH, idx:0});
+    // Map drawing (single map or 3-map layout)
+    const ZOOM = 1.12;
+
+    function drawOneMap(img, rx, ry, rw, rh, label){
+      const insetLocal = Math.round(14*S);
+      const innerRX = rx + insetLocal;
+      const innerRY = ry + insetLocal;
+      const innerRW = rw - insetLocal*2;
+      const innerRH = rh - insetLocal*2;
+
+      const ar = img.width / img.height;
+      const targetAr = innerRW / innerRH;
+      let drawW, drawH, dx, dy;
+
+      if(ar > targetAr){
+        drawW = innerRW;
+        drawH = innerRW / ar;
+        dx = innerRX;
+        dy = innerRY + (innerRH - drawH)/2;
+      } else {
+        drawH = innerRH;
+        drawW = innerRH * ar;
+        dx = innerRX + (innerRW - drawW)/2;
+        dy = innerRY;
       }
 
-      // Draw each map frame
-      const inset = Math.round(18*S);
-      const ZOOM = 1.12;
+      const cx = dx + drawW/2;
+      const cy = dy + drawH/2;
+      drawW = drawW * ZOOM;
+      drawH = drawH * ZOOM;
+      dx = cx - drawW/2;
+      dy = cy - drawH/2;
 
-      // Track drawW of first map for scale calculation
-      let firstDrawW = null;
+      ctx.fillStyle = "#ffffff";
+      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
+      ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,0.12)";
+      ctx.lineWidth=Math.max(1,Math.round(2*S));
+      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
+      ctx.stroke();
 
-      for(const fr of frames){
-        const img = imgs[Math.min(fr.idx, imgs.length-1)];
-        const fx = fr.x, fy = fr.y, fw = fr.w, fh = fr.h;
+      ctx.save();
+      drawRoundedRect(ctx, rx, ry, rw, rh, Math.round(18*S));
+      ctx.clip();
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+      ctx.restore();
 
-        // frame background + border
-        ctx.fillStyle = "#cfe8f3";
-        drawRoundedRect(ctx, fx, fy, fw, fh, Math.round(22*S));
-        ctx.fill();
-
-        ctx.strokeStyle="rgba(0,0,0,0.12)";
-        ctx.lineWidth=Math.max(1,Math.round(2*S));
-        drawRoundedRect(ctx, fx, fy, fw, fh, Math.round(22*S));
-        ctx.stroke();
-
-        // label (if 3 maps)
-        let imgAreaY = fy;
-        let imgAreaH = fh;
-        if(isThree){
-          const lbl = (initial.labels && initial.labels[fr.idx]) ? initial.labels[fr.idx] : ("Mapa " + (fr.idx+1));
-          ctx.save();
-          ctx.fillStyle = "rgba(255,255,255,0.92)";
-          const lx = fx + Math.round(10*S), ly = fy + Math.round(10*S);
-          const lw = fw - Math.round(20*S), lh = labelH - Math.round(14*S);
-          drawRoundedRect(ctx, lx, ly, lw, lh, Math.round(12*S));
-          ctx.fill();
-          ctx.fillStyle="#111";
-          ctx.font="900 "+Math.round(22*S)+"px system-ui, sans-serif";
-          ctx.textAlign="center";
-          ctx.textBaseline="middle";
-          ctx.fillText(lbl, fx + fw/2, fy + Math.round(labelH/2));
-          ctx.restore();
-          imgAreaY = fy + labelH;
-          imgAreaH = fh - labelH;
-        }
-
-        const innerX = fx + inset;
-        const innerY = imgAreaY + inset;
-        const innerW = fw - inset*2;
-        const innerH = imgAreaH - inset*2;
-
-        // aspect fit
-        const ar = img.width / img.height;
-        const targetAr = innerW / innerH;
-        let drawW, drawH, dx, dy;
-        if(ar > targetAr){
-          drawW = innerW;
-          drawH = innerW / ar;
-          dx = innerX;
-          dy = innerY + (innerH - drawH)/2;
-        } else {
-          drawH = innerH;
-          drawW = innerH * ar;
-          dx = innerX + (innerW - drawW)/2;
-          dy = innerY;
-        }
-
-        // zoom in
-        const cx = dx + drawW/2;
-        const cy = dy + drawH/2;
-        drawW = drawW * ZOOM;
-        drawH = drawH * ZOOM;
-        dx = cx - drawW/2;
-        dy = cy - drawH/2;
-
-        if(firstDrawW === null) firstDrawW = drawW;
-
-        // clip + draw
+      if(label){
         ctx.save();
-        drawRoundedRect(ctx, fx, fy, fw, fh, Math.round(22*S));
-        ctx.clip();
-        ctx.drawImage(img, dx, dy, drawW, drawH);
+        ctx.fillStyle="rgba(255,255,255,.92)";
+        const lh = Math.round(40*S);
+        const lw = Math.min(rw - Math.round(16*S), Math.round(520*S));
+        const lx = rx + Math.round(10*S);
+        const ly = ry + Math.round(10*S);
+        drawRoundedRect(ctx, lx, ly, lw, lh, Math.round(14*S));
+        ctx.fill();
+        ctx.strokeStyle="rgba(0,0,0,0.10)";
+        ctx.lineWidth=Math.max(1,Math.round(2*S));
+        drawRoundedRect(ctx, lx, ly, lw, lh, Math.round(14*S));
+        ctx.stroke();
+        ctx.fillStyle="#111";
+        ctx.font="900 "+Math.round(20*S)+"px system-ui, sans-serif";
+        ctx.textAlign="left";
+        ctx.textBaseline="middle";
+        ctx.fillText(String(label).slice(0,40), lx+Math.round(14*S), ly+lh/2);
         ctx.restore();
       }
 
-      // Overlays anchored to full map area (not per-cell)
-      const legendSide = ($("legendSide")? $("legendSide").value : "right");
-      const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
+      return {drawW, drawH, dx, dy};
+    }
 
-      if(showNorth){
-        drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
+    // container frame
+    ctx.fillStyle = "#cfe8f3";
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,0.12)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.stroke();
+
+    let firstDrawW = null;
+
+    if(imgs.length >= 3){
+      const gap = Math.round(18*S);
+      const arSel2 = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
+      const isLand = (arSel2==="a4_land");
+      if(isLand){
+        const cellW = (innerW - gap*2) / 3;
+        for(let i=0;i<3;i++){
+          const rx = innerX + i*(cellW + gap);
+          const ry = innerY;
+          const rw = cellW;
+          const rh = innerH;
+          const r = drawOneMap(imgs[i], rx, ry, rw, rh, mapLabels[i] || "");
+          if(i===0) firstDrawW = r.drawW;
+        }
+      } else {
+        const cellH = (innerH - gap*2) / 3;
+        for(let i=0;i<3;i++){
+          const rx = innerX;
+          const ry = innerY + i*(cellH + gap);
+          const rw = innerW;
+          const rh = cellH;
+          const r = drawOneMap(imgs[i], rx, ry, rw, rh, mapLabels[i] || "");
+          if(i===0) firstDrawW = r.drawW;
+        }
       }
+    } else {
+      const r = drawOneMap(imgs[0], mapX, mapY, mapW, mapH, mapLabels[0] || "");
+      firstDrawW = r.drawW;
+    }
 
+// overlays
+    const legendSide = ($("legendSide")? $("legendSide").value : "right");
+    const scaleSide = ($("scaleSide")? $("scaleSide").value : "left");
+
+    if(showNorth){
+      drawNorthArrow(ctx, mapX + mapW - Math.round(90*S), mapY + Math.round(110*S), Math.round(34*S));
+    }
       if(showScale){
+        // 1) manual override
         let km = Number(scaleKm);
-        if(!(isFinite(km) && km>0) && initial.bbox && isFinite(firstDrawW)){
+        // 2) auto-scale from bbox if available
+        if(!(isFinite(km) && km>0) && initial.bbox){
           const b = initial.bbox;
           const midLat = (b.n + b.s)/2;
           const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-          const kmPerPx = bboxWidthKm / Math.max(1, firstDrawW);
+          // Use the actual drawn map width (drawW) to compute km/px
+          const kmPerPx = bboxWidthKm / Math.max(1, (firstDrawW||1));
           const targetKm = kmPerPx * scalePx;
           km = niceKm(targetKm);
+          // keep the bar visually consistent: adjust pixels to match the chosen nice km
           scalePx = Math.round(km / kmPerPx);
         }
         if(isFinite(km) && km>0){
@@ -956,84 +964,64 @@
           drawScaleBar(ctx, scaleX, scaleY, scalePx, km + " km", S);
         }
       }
+    if(showLegend){
+      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      const legH = Math.round(140*S);
+      const legMargin = Math.round(26*S);
 
-      // Legend placement
-      _lastLegendRect = null;
-      _lastLegendArea = {x: mapX, y: mapY, w: mapW, h: mapH};
+      let legX = (legendSide==="left")
+        ? (mapX + legMargin)
+        : (mapX + mapW - legW - legMargin);
 
-      if(showLegend){
-        const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-        const legH = Math.round(140*S);
-        const legMargin = Math.round(26*S);
+      let legY = mapY + mapH - legH - legMargin;
+      if(showScale && legendSide === scaleSide){
+        const scaleStackH = Math.round(54*S);
+        const gap = Math.round(14*S);
+        legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
+      }
+      legY = Math.max(mapY + legMargin, legY);
 
-        // If we have an incoming legend pos from payload, adopt it once.
-        if(_legendPos === null && initial.legendPos) _legendPos = {x: initial.legendPos.x, y: initial.legendPos.y};
+      const dragLegend = ($("dragLegend") && $("dragLegend").checked);
 
-        // Default: side-based
-        let legX = (legendSide==="left")
-          ? (mapX + legMargin)
-          : (mapX + mapW - legW - legMargin);
-
-        let legY = mapY + mapH - legH - legMargin;
-
-        // Stack above scale bar if same side
-        if(showScale && legendSide === scaleSide){
-          const scaleStackH = Math.round(54*S);
-          const gap2 = Math.round(14*S);
-          legY = mapY + mapH - legH - legMargin - scaleStackH - gap2;
-        }
-        legY = Math.max(mapY + legMargin, legY);
-
-        // Free mode: use _legendPos (fractions) if available, else initialize from current side
-        if(legendFree){
-          if(!_legendPos){
-            _legendPos = {
-              x: (legX - mapX) / Math.max(1, (mapW - legW)),
-              y: (legY - mapY) / Math.max(1, (mapH - legH))
-            };
-          }
-          // clamp
-          const maxX = Math.max(0, mapW - legW);
-          const maxY = Math.max(0, mapH - legH);
-          const pxX = mapX + Math.min(maxX, Math.max(0, _legendPos.x * maxX));
-          const pxY = mapY + Math.min(maxY, Math.max(0, _legendPos.y * maxY));
-          legX = Math.round(pxX);
-          legY = Math.round(pxY);
-        }else{
-          _legendPos = null; // side mode ignores stored position
-        }
-
-        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
-        _lastLegendRect = {x: legX, y: legY, w: legW, h: legH};
-
-        // Update canvas cursor hint
-        canvas.classList.toggle("dragLegend", legendFree);
-      }else{
-        canvas.classList.remove("dragLegend","dragging");
+      if(dragLegend){
+        if(!LEGEND_POS){ LEGEND_POS = {x: legX, y: legY}; }
+        const minX = mapX + legMargin;
+        const maxX = mapX + mapW - legW - legMargin;
+        const minY = mapY + legMargin;
+        const maxY = mapY + mapH - legH - legMargin;
+        LEGEND_POS.x = clamp(LEGEND_POS.x, minX, maxX);
+        LEGEND_POS.y = clamp(LEGEND_POS.y, minY, maxY);
+        legX = LEGEND_POS.x;
+        legY = LEGEND_POS.y;
+      } else {
+        LEGEND_POS = null;
       }
 
-      if(showFooter){
-        ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
-        ctx.textAlign="right";
-        ctx.textBaseline="middle";
-        ctx.fillStyle="#4b5563";
-        const defaultTail = (LANG==="ca") ? "Generat amb InsuLab" : (LANG==="es") ? "Generado con InsuLab" : "Generated with InsuLab";
-        const tail = (footer && footer.length) ? footer : defaultTail;
-        ctx.fillText(tail, W - pad, H - Math.round(52*S));
-      }
+      LAST_LEGEND_BOX = {x: legX, y: legY, w: legW, h: legH, mapX, mapY, mapW, mapH, margin: legMargin};
+
+      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+    }
+
+    if(showFooter){
+      // Single footer (right aligned). If user provides a footer text, it replaces the default.
+      ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
+      ctx.textAlign="right"; 
+      ctx.textBaseline="middle";
+      ctx.fillStyle="#4b5563";
+      const defaultTail = (LANG==="ca") ? "Generat amb InsuLab" : (LANG==="es") ? "Generado con InsuLab" : "Generated with InsuLab";
+      const tail = (footer && footer.length) ? footer : defaultTail;
+      ctx.fillText(tail, W - pad, H - Math.round(52*S));
+    }
 
       setStatus(t("done"));
     }catch(e){
+      // Avoid leaving UI stuck on "Generating..."
       setErr((e && e.message) ? String(e.message) : String(e));
       setStatus("");
     }finally{
       $("btnRender").disabled=false;
-      if(!_isDraggingLegend) canvas.classList.remove("dragging");
-      _rendering = false;
-      if(_renderPending){ _renderPending = false; render(); }
     }
   }
-
 
   function download(){
     setErr("");
@@ -1059,72 +1047,10 @@
     setStatus("");
   });
 
-
-  // ---------- legend drag interaction (only when "Move legend" is enabled) ----------
-  function _canvasToLocal_(ev){
-    const r = canvas.getBoundingClientRect();
-    // convert client coords to canvas pixels (account for CSS scaling)
-    const x = (ev.clientX - r.left) * (canvas.width / r.width);
-    const y = (ev.clientY - r.top)  * (canvas.height / r.height);
-    return {x,y};
-  }
-
-  canvas.addEventListener("pointerdown", (ev) => {
-    if(!($("legendFree") && $("legendFree").checked)) return;
-    if(!_lastLegendRect) return;
-    const p = _canvasToLocal_(ev);
-    const r = _lastLegendRect;
-    const hit = (p.x>=r.x && p.x<=r.x+r.w && p.y>=r.y && p.y<=r.y+r.h);
-    if(!hit) return;
-
-    _isDraggingLegend = true;
-    canvas.classList.add("dragging");
-    canvas.setPointerCapture(ev.pointerId);
-    _dragOff = {x: p.x - r.x, y: p.y - r.y};
-    ev.preventDefault();
-  });
-
-  canvas.addEventListener("pointermove", (ev) => {
-    if(!_isDraggingLegend) return;
-    if(!_lastLegendRect || !_lastLegendArea) return;
-    const p = _canvasToLocal_(ev);
-    const area = _lastLegendArea;
-    const r = _lastLegendRect;
-
-    const maxX = Math.max(0, area.w - r.w);
-    const maxY = Math.max(0, area.h - r.h);
-
-    let nx = (p.x - area.x - _dragOff.x);
-    let ny = (p.y - area.y - _dragOff.y);
-    nx = Math.min(maxX, Math.max(0, nx));
-    ny = Math.min(maxY, Math.max(0, ny));
-
-    _legendPos = {
-      x: maxX ? (nx / maxX) : 0,
-      y: maxY ? (ny / maxY) : 0
-    };
-
-    // redraw (cached images => fast)
-    render();
-    ev.preventDefault();
-  });
-
-  const _endDrag = (ev) => {
-    if(!_isDraggingLegend) return;
-    _isDraggingLegend = false;
-    canvas.classList.remove("dragging");
-    try{ canvas.releasePointerCapture(ev.pointerId); }catch(_e){}
-    // One final render to ensure clean state
-    render();
-  };
-
-  canvas.addEventListener("pointerup", _endDrag);
-  canvas.addEventListener("pointercancel", _endDrag);
-
-
   // init
   applyLang();
   loadFromQuery();
+  initLegendDrag();
   if(qs("p") || qs("map")) setTimeout(render, 60);
 })();
 </script>
