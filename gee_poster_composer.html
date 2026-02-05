@@ -387,26 +387,7 @@
     }).filter(Boolean);
   };
 
-  
-  // Palette from payload: accepts array of hex strings (with or without '#') or comma-separated string.
-  const paletteFromAny = (p) => {
-    if(!p) return parsePalette("");
-    if(Array.isArray(p)){
-      return p.map(x => {
-        let s = String(x||"").trim();
-        if(!s) return null;
-        // already valid css color?
-        if(/^rgba?\(/i.test(s) || /^hsla?\(/i.test(s)) return s;
-        // hex (with or without #)
-        s = s.replace("#","");
-        if(s.length===3) s=s[0]+s[0]+s[1]+s[1]+s[2]+s[2];
-        if(/^[0-9a-fA-F]{6}$/.test(s)) return "#"+s;
-        return null;
-      }).filter(Boolean);
-    }
-    return parsePalette(String(p));
-  };
-const slug = (s) => (String(s||"").toLowerCase()
+  const slug = (s) => (String(s||"").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90) || "poster");
 
@@ -748,6 +729,8 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
         }
       })();
       const mapLabels = (payloadForLabels && Array.isArray(payloadForLabels.labels)) ? payloadForLabels.labels : null;
+      const diffLegend = (payloadForLabels && payloadForLabels.legendDiff) ? payloadForLabels.legendDiff : null;
+
       if(!mapUrl){
         setErr(t("missingMap"));
         return;
@@ -1012,72 +995,60 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
         }
       }
     if(showLegend){
-      const payload = payloadForLabels; // parsed from ?p=, may be null
-      const hasDiff = !!(payload && payload.legendDiff && payload.legendDiff.palette);
-
+      let legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      // If Δ legend exists, allocate more width for side-by-side legends
+      if(diffLegend && Array.isArray(diffLegend.palette) && diffLegend.palette.length){
+        legW = Math.min(Math.round(980*S), Math.round(mapW * 0.82));
+      }
+      const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
       // Base position by side
-      // Group width depends on whether we draw one or two legends
-      const legWsingle = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(140*S);
-      const gapLeg = Math.round(18*S);
-
-      const legW = hasDiff
-        ? Math.min(Math.round(980*S), Math.round(mapW * 0.70))
-        : legWsingle;
-
       let legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
-      // Stack with scale bar if needed
+      // If scale is on and same side, stack legend above the scale bar
       let legY = mapY + mapH - legH - legMargin;
       if(showScale && legendSide === scaleSide){
-        const scaleStackH = Math.round(54*S);
+        const scaleStackH = Math.round(54*S); // approx vertical footprint of scale bar + label
         const gap = Math.round(14*S);
         legY = mapY + mapH - legH - legMargin - scaleStackH - gap;
       }
+      // Safety clamp (avoid going above the map)
       legY = Math.max(mapY + legMargin, legY);
 
-      // Draggable override
+      // Draggable legend override
       if(legendEnabled() && legendDragState.x!==null && legendDragState.y!==null){
         legX = legendDragState.x;
         legY = legendDragState.y;
+        // clamp inside map frame
+        legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
+        legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - legH - legMargin);
       }
-      // clamp inside map frame
-      legX = Math.min(Math.max(legX, mapX + legMargin), mapX + mapW - legW - legMargin);
-      legY = Math.min(Math.max(legY, mapY + legMargin), mapY + mapH - legH - legMargin);
-
       setLegendRect(legX, legY, legW, legH);
 
-      // Resolve main legend params (prefer payload.legendMain/meta; fallback to UI inputs)
-      const mainMin = (payload && payload.legendMain && payload.legendMain.min!==null && payload.legendMain.min!==undefined) ? payload.legendMain.min : vmin;
-      const mainMax = (payload && payload.legendMain && payload.legendMain.max!==null && payload.legendMain.max!==undefined) ? payload.legendMain.max : vmax;
-      const mainPalette = paletteFromAny((payload && payload.legendMain && payload.legendMain.palette) || (payload && payload.meta && payload.meta.palette) || null) || palette;
-
-      // Title for main legend: if unit provided in UI, use it; else use generic 'Llegenda'
-      const mainTitle = unit || t("legend");
-
-      if(hasDiff){
-        const wEach = Math.floor((legW - gapLeg) / 2);
-        const w2 = legW - gapLeg - wEach;
-
-        // main (left)
-        drawLegend(ctx, legX, legY, wEach, legH, mainMin, mainMax, mainTitle, mainPalette, S);
-
-        // diff (right)
-        const d = payload.legendDiff || {};
-        const dMin = (d.min!==null && d.min!==undefined) ? d.min : "";
-        const dMax = (d.max!==null && d.max!==undefined) ? d.max : "";
-        const dTitle = d.unit || "Δ (B−A)";
-        const dPalette = paletteFromAny(d.palette);
-        drawLegend(ctx, legX + wEach + gapLeg, legY, w2, legH, dMin, dMax, dTitle, dPalette, S);
-      } else {
-        drawLegend(ctx, legX, legY, legW, legH, mainMin, mainMax, mainTitle, mainPalette, S);
+      
+      // Draw one or two legends (main + Δ) depending on payload.legendDiff
+      if(diffLegend && Array.isArray(diffLegend.palette) && diffLegend.palette.length){
+        const dmin = (diffLegend.min!==undefined && diffLegend.min!==null) ? String(diffLegend.min) : "";
+        const dmax = (diffLegend.max!==undefined && diffLegend.max!==null) ? String(diffLegend.max) : "";
+        const dpal = parsePalette((diffLegend.palette||[]).join(","));
+        // side-by-side legends
+        const gapL = Math.round(18*S);
+        const perW = Math.round((legW - gapL)/2);
+        const leftX = legX;
+        const rightX = legX + perW + gapL;
+        drawLegend(ctx, leftX, legY, perW, legH, vmin, vmax, unit, palette, S);
+        drawLegend(ctx, rightX, legY, perW, legH, dmin, dmax, "Δ (B − A)", dpal, S);
+      }else{
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
       }
+
     }
-rovides a footer text, it replaces the default.
+
+    if(showFooter){
+      // Single footer (right aligned). If user provides a footer text, it replaces the default.
       ctx.font="650 "+Math.round(18*S)+"px system-ui, sans-serif";
       ctx.textAlign="right"; 
       ctx.textBaseline="middle";
