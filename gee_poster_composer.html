@@ -68,12 +68,6 @@
       border-radius: var(--radius);
       display:block;
     }
-  
-    details.debug{border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:10px 12px;margin-top:10px}
-    details.debug > summary{cursor:pointer;font-weight:650;color:#111;list-style:none}
-    details.debug > summary::-webkit-details-marker{display:none}
-    details.debug[open]{background:#fff}
-
   </style>
 </head>
 <body>
@@ -110,21 +104,17 @@
   <div class="grid">
     <section class="card">
       <div class="pad">
-        <details id="debugBlock" class="debug"><summary id="sumDebug">Enllaços del mapa (debug)</summary>
-<label id="labMap"></label>
-        <input id="mapUrl" placeholder="" />
-
-        <div class="row" style="margin-top:10px">
-          <div style="flex:1">
-            <label id="labMap2">Mapa 2</label>
+        <details id="dbgLinks">
+          <summary style="font-weight:900; cursor:pointer; padding:8px 0;">Enllaços del mapa (debug)</summary>
+          <div style="padding-top:8px">
+            <label id="labMap"></label>
+            <input id="mapUrl" placeholder="" />
+            <label id="labMap2" style="margin-top:10px"></label>
             <input id="mapUrl2" placeholder="" />
-          </div>
-          <div style="flex:1">
-            <label id="labMap3">Mapa 3</label>
+            <label id="labMap3" style="margin-top:10px"></label>
             <input id="mapUrl3" placeholder="" />
           </div>
-        </div>
-
+        </details>
 
         <div class="row">
           <div style="flex:1">
@@ -195,9 +185,7 @@
           <span id="advTitle"></span>
 </summary>
         <div class="pad">
-          <label 
-</details>
-id="labTitle"></label>
+          <label id="labTitle"></label>
           <input id="title" />
 
           <label id="labSubtitle"></label>
@@ -297,6 +285,8 @@ id="labTitle"></label>
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
+    if($("labMap2")) $("labMap2").textContent = "Mapa 2";
+    if($("labMap3")) $("labMap3").textContent = "Mapa 3";
     if($("labMap2")) $("labMap2").textContent = t("map") + " 2";
     if($("labMap3")) $("labMap3").textContent = t("map") + " 3";
     if($("labLegendDrag")) $("labLegendDrag").textContent = (LANG==="ca"?"Moure llegenda (arrossegar)":(LANG==="es"?"Mover leyenda (arrastrar)":"Move legend (drag)"));
@@ -750,6 +740,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     // poster aspect ratio
     const outW = posterW;
     const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
+    const posterAR = arSel;
     const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
@@ -873,7 +864,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
     } else {
       // 3-map layout inside the same frame
-      const isLand = (arSel==="a4_land");
+      const isLand = (posterAR==="a4_land");
       const gapIn = Math.round(14*S);
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
@@ -1024,24 +1015,17 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     }
   }
 
-  
-  // --- draggable legend state ---
-  const legendDragState = {x:null,y:null,w:0,h:0,dragging:false,dx:0,dy:0};
-  function setLegendRect(x,y,w,h){
-    legendDragState.w=w; legendDragState.h=h;
-    // only set initial position when not already dragged
-    if(legendDragState.x===null || legendDragState.y===null){
-      legendDragState.x=x; legendDragState.y=y;
-    }
-  }
+
+  // Legend drag state (for free positioning)
+  const legendDragState = { x:null, y:null, w:0, h:0, dragging:false, dx:0, dy:0 };
+
   function legendEnabled(){
-    // enabled only if legend is shown and drag mode is ON
-    const drag = $("legendDrag") ? $("legendDrag").checked : false;
-    const show = $("showLegend") ? $("showLegend").checked : false;
-    return !!(drag && show);
+    const show = ($("showLegend") && $("showLegend").checked);
+    const drag = ($("legendDrag") && $("legendDrag").checked);
+    return !!(show && drag);
   }
 
-// wire
+  // wire
   $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
   $("legendDrag").addEventListener("change", () => {
