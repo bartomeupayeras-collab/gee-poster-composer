@@ -347,6 +347,19 @@
 
   // ---------- helpers ----------
   const sanitize = (s) => (s===null || s===undefined) ? "" : String(s);
+
+  const normalizeColor = (c) => {
+    if(c===null || c===undefined) return "#000000";
+    let s = String(c).trim();
+    if(!s) return "#000000";
+    // Already valid CSS color forms
+    if(s.startsWith("#") || s.startsWith("rgb(") || s.startsWith("rgba(") || s.startsWith("hsl(") || s.startsWith("hsla(")) return s;
+    // Earth Engine palettes are often hex without '#'
+    const hex = s.replace(/^0x/i,"").replace(/[^0-9a-fA-F]/g,"");
+    if(hex.length===3 || hex.length===4 || hex.length===6 || hex.length===8) return "#" + hex;
+    return s; // fallback: let canvas try to parse
+  };
+
   const setIf = (id, v) => { if(v!==null && v!==undefined && v!=="") $(id).value = v; };
   const setErr = (msg) => {
     const el = $("err");
@@ -450,8 +463,9 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     const barX=x+pad, barY=y+Math.round(56*S), barW=w-(pad*2), barH=Math.round(16*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
-    const stops=Math.max(1,palette.length-1);
-    for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
+    const pal = (palette||[]).map(normalizeColor);
+    const stops=Math.max(1,pal.length-1);
+    for(let i=0;i<pal.length;i++) grad.addColorStop(i/stops, pal[i]);
     ctx.fillStyle=grad;
     drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(8*S));
     ctx.fill();
