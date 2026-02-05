@@ -468,6 +468,47 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     ctx.restore();
   }
+
+  // Draw one or two legends (main + optional Δ) inside a single draggable box.
+  function drawLegendGroup(ctx,x,y,w,h,mainSpec,diffSpec,S){
+    // Container
+    ctx.save();
+    ctx.globalAlpha=.98;
+    ctx.fillStyle="#fff";
+    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    ctx.fill();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle="rgba(0,0,0,0.10)";
+    ctx.lineWidth=Math.max(1,Math.round(2*S));
+    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
+    ctx.stroke();
+    ctx.restore();
+
+    const pad = Math.round(14*S);
+    const innerX = x + pad;
+    const innerY = y + pad;
+    const innerW = w - pad*2;
+    const hasDiff = !!(diffSpec && diffSpec.palette && diffSpec.palette.length);
+
+    if(!hasDiff){
+      drawLegend(ctx, x, y, w, h, mainSpec.min, mainSpec.max, mainSpec.unit, mainSpec.palette, S);
+      return;
+    }
+
+    // Split vertically: main (top) + diff (bottom)
+    const gap = Math.round(10*S);
+    const halfH = Math.floor((h - pad*2 - gap)/2);
+
+    const box1 = {x: innerX, y: innerY, w: innerW, h: halfH};
+    const box2 = {x: innerX, y: innerY + halfH + gap, w: innerW, h: halfH};
+
+    // We reuse drawLegend but without its own container:
+    // simplest safe approach: call drawLegend on sub-rectangles, but it draws its own rounded container.
+    // That's ok visually; it yields two small cards inside the outer card.
+    drawLegend(ctx, box1.x, box1.y, box1.w, box1.h, mainSpec.min, mainSpec.max, mainSpec.unit, mainSpec.palette, S);
+    drawLegend(ctx, box2.x, box2.y, box2.w, box2.h, diffSpec.min, diffSpec.max, diffSpec.unit, diffSpec.palette, S);
+  }
+
   function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
@@ -487,6 +528,9 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
   // ---------- payload / params ----------
   const initial = {
     mapUrl:"", mapUrl2:"", mapUrl3:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
+    // Optional per-mode legend descriptors from the visor (preferred when present)
+    legendMain:null,
+    legendDiff:null,
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
     dims:null
@@ -545,6 +589,14 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
           initial.unit = payload.meta.unit || "";
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
+        }
+
+        // Prefer explicit legend descriptors when provided by the visor (3-map mode)
+        if(payload.legendMain && typeof payload.legendMain === 'object'){
+          initial.legendMain = payload.legendMain;
+        }
+        if(payload.legendDiff && typeof payload.legendDiff === 'object'){
+          initial.legendDiff = payload.legendDiff;
         }
         const f = [
           payload.meta?.island || "",
@@ -889,6 +941,18 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           // label
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
+          // separator between maps
+          if(i<2){
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+            ctx.lineWidth = Math.max(1, Math.round(2*S));
+            const xSep = sx + sw + gapIn/2;
+            ctx.beginPath();
+            ctx.moveTo(xSep, sy + Math.round(10*S));
+            ctx.lineTo(xSep, sy + sh - Math.round(10*S));
+            ctx.stroke();
+            ctx.restore();
+          }
         }
       } else {
         const slotH = (innerH - gapIn*2)/3;
@@ -912,6 +976,18 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           ctx.restore();
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
+          // separator between maps
+          if(i<2){
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+            ctx.lineWidth = Math.max(1, Math.round(2*S));
+            const ySep = sy + sh + gapIn/2;
+            ctx.beginPath();
+            ctx.moveTo(sx + Math.round(10*S), ySep);
+            ctx.lineTo(sx + sw - Math.round(10*S), ySep);
+            ctx.stroke();
+            ctx.restore();
+          }
         }
       }
     }
@@ -947,12 +1023,13 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
         }
       }
     if(showLegend){
+      const hasDiffLegend = !!(initial.legendDiff && Array.isArray(initial.legendDiff.palette) && initial.legendDiff.palette.length);
       const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = Math.round(140*S);
+      const legH = hasDiffLegend ? Math.round(320*S) : Math.round(140*S);
       const legMargin = Math.round(26*S);
 
       // Base position by side
-      const legX = (legendSide==="left")
+      let legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
@@ -976,7 +1053,25 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       }
       setLegendRect(legX, legY, legW, legH);
 
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      const mainSpec = (initial.legendMain && Array.isArray(initial.legendMain.palette) && initial.legendMain.palette.length)
+        ? {
+            min: initial.legendMain.min,
+            max: initial.legendMain.max,
+            unit: initial.legendMain.unit || (unit || t("legend")),
+            palette: initial.legendMain.palette
+          }
+        : { min: vmin, max: vmax, unit: (unit || t("legend")), palette: palette };
+
+      const diffSpec = (hasDiffLegend)
+        ? {
+            min: initial.legendDiff.min,
+            max: initial.legendDiff.max,
+            unit: initial.legendDiff.unit || "Δ (B−A)",
+            palette: initial.legendDiff.palette
+          }
+        : null;
+
+      drawLegendGroup(ctx, legX, legY, legW, legH, mainSpec, diffSpec, S);
     }
 
     if(showFooter){
