@@ -864,7 +864,8 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
     } else {
       // 3-map layout inside the same frame
-      const isLand = (posterAR==="a4_land");
+      // IMPORTANT: use selected value (string), not the DOM element.
+      const isLand = (arSel === "a4_land");
       const gapIn = Math.round(22*S);
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
@@ -976,7 +977,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       const legMargin = Math.round(26*S);
 
       // Base position by side
-      const legX = (legendSide==="left")
+      let legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
