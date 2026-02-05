@@ -725,6 +725,12 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     const vmax = (($("vmax") && $("vmax").value) || "").trim();
     const unit = ($("unit").value||"").trim();
     const palette = parsePalette(($("palette").value||"").trim());
+    // Fallback palette if the payload did not provide one (avoid empty legend)
+    let paletteUse = palette;
+    if(!Array.isArray(paletteUse) || paletteUse.length < 2){
+      // Diverging palette works well for Δ maps too
+      paletteUse = ["#2c7bb6","#ffffbf","#d7191c"];
+    }
     const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
     let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
     if(!isFinite(scalePx) || scalePx<=0) scalePx=180;
@@ -976,7 +982,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       }
       setLegendRect(legX, legY, legW, legH);
 
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, paletteUse, S);
     }
 
     if(showFooter){
