@@ -104,17 +104,20 @@
   <div class="grid">
     <section class="card">
       <div class="pad">
-        <details id="dbgLinks">
-          <summary style="font-weight:900; cursor:pointer; padding:8px 0;">Enllaços del mapa (debug)</summary>
-          <div style="padding-top:8px">
-            <label id="labMap"></label>
-            <input id="mapUrl" placeholder="" />
-            <label id="labMap2" style="margin-top:10px"></label>
+        <label id="labMap"></label>
+        <input id="mapUrl" placeholder="" />
+
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1">
+            <label id="labMap2">Mapa 2</label>
             <input id="mapUrl2" placeholder="" />
-            <label id="labMap3" style="margin-top:10px"></label>
+          </div>
+          <div style="flex:1">
+            <label id="labMap3">Mapa 3</label>
             <input id="mapUrl3" placeholder="" />
           </div>
-        </details>
+        </div>
+
 
         <div class="row">
           <div style="flex:1">
@@ -285,8 +288,6 @@
     $("btnRender").textContent = t("render");
     $("btnDownload").textContent = t("download");
     $("labMap").textContent = t("map");
-    if($("labMap2")) $("labMap2").textContent = "Mapa 2";
-    if($("labMap3")) $("labMap3").textContent = "Mapa 3";
     if($("labMap2")) $("labMap2").textContent = t("map") + " 2";
     if($("labMap3")) $("labMap3").textContent = t("map") + " 3";
     if($("labLegendDrag")) $("labLegendDrag").textContent = (LANG==="ca"?"Moure llegenda (arrossegar)":(LANG==="es"?"Mover leyenda (arrastrar)":"Move legend (drag)"));
@@ -347,19 +348,6 @@
 
   // ---------- helpers ----------
   const sanitize = (s) => (s===null || s===undefined) ? "" : String(s);
-
-  const normalizeColor = (c) => {
-    if(c===null || c===undefined) return "#000000";
-    let s = String(c).trim();
-    if(!s) return "#000000";
-    // Already valid CSS color forms
-    if(s.startsWith("#") || s.startsWith("rgb(") || s.startsWith("rgba(") || s.startsWith("hsl(") || s.startsWith("hsla(")) return s;
-    // Earth Engine palettes are often hex without '#'
-    const hex = s.replace(/^0x/i,"").replace(/[^0-9a-fA-F]/g,"");
-    if(hex.length===3 || hex.length===4 || hex.length===6 || hex.length===8) return "#" + hex;
-    return s; // fallback: let canvas try to parse
-  };
-
   const setIf = (id, v) => { if(v!==null && v!==undefined && v!=="") $(id).value = v; };
   const setErr = (msg) => {
     const el = $("err");
@@ -423,20 +411,20 @@
   function drawMapLabel(ctx,label,x,y,w,h,S){
     ctx.save();
     const pad = Math.round(12*S);
-    ctx.font = "800 " + Math.round(22*S) + "px system-ui, sans-serif";
+    ctx.font = "900 " + Math.round(26*S) + "px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const boxW = Math.min(w*0.9, ctx.measureText(label).width + pad*4);
-    const boxH = Math.round(34*S);
+    const boxH = Math.round(40*S);
     const bx = x + w/2 - boxW/2;
-    const by = y + Math.round(10*S);
+    const by = y + Math.round(12*S);
     ctx.globalAlpha = 0.92;
     ctx.fillStyle = "#ffffff";
     drawRoundedRect(ctx, bx, by, boxW, boxH, Math.round(14*S));
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#111";
-    ctx.fillText(label, x + w/2, by + Math.round(6*S));
+    ctx.fillText(label, x + w/2, by + Math.round(7*S));
     ctx.restore();
   }
 
@@ -463,9 +451,8 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     const barX=x+pad, barY=y+Math.round(56*S), barW=w-(pad*2), barH=Math.round(16*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
-    const pal = (palette||[]).map(normalizeColor);
-    const stops=Math.max(1,pal.length-1);
-    for(let i=0;i<pal.length;i++) grad.addColorStop(i/stops, pal[i]);
+    const stops=Math.max(1,palette.length-1);
+    for(let i=0;i<palette.length;i++) grad.addColorStop(i/stops, palette[i]);
     ctx.fillStyle=grad;
     drawRoundedRect(ctx,barX,barY,barW,barH,Math.round(8*S));
     ctx.fill();
@@ -482,46 +469,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     ctx.restore();
   }
-
-  // Draw one or two legends (main + optional Δ) inside a single draggable box.
-  // If Δ exists, we place the two legends SIDE-BY-SIDE to reduce height and avoid covering the map.
-  function drawLegendGroup(ctx,x,y,w,h,mainSpec,diffSpec,S){
-    // Outer container
-    ctx.save();
-    ctx.globalAlpha=.98;
-    ctx.fillStyle="#fff";
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
-    ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.strokeStyle="rgba(0,0,0,0.10)";
-    ctx.lineWidth=Math.max(1,Math.round(2*S));
-    drawRoundedRect(ctx,x,y,w,h,Math.round(18*S));
-    ctx.stroke();
-    ctx.restore();
-
-    const pad = Math.round(14*S);
-    const innerX = x + pad;
-    const innerY = y + pad;
-    const innerW = w - pad*2;
-    const innerH = h - pad*2;
-    const hasDiff = !!(diffSpec && diffSpec.palette && diffSpec.palette.length);
-
-    if(!hasDiff){
-      drawLegend(ctx, x, y, w, h, mainSpec.min, mainSpec.max, mainSpec.unit, mainSpec.palette, S);
-      return;
-    }
-
-    // Split HORIZONTALLY: main (left) + diff (right)
-    const gap = Math.round(12*S);
-    const halfW = Math.floor((innerW - gap)/2);
-
-    const box1 = {x: innerX, y: innerY, w: halfW, h: innerH};
-    const box2 = {x: innerX + halfW + gap, y: innerY, w: halfW, h: innerH};
-
-    drawLegend(ctx, box1.x, box1.y, box1.w, box1.h, mainSpec.min, mainSpec.max, mainSpec.unit, mainSpec.palette, S);
-    drawLegend(ctx, box2.x, box2.y, box2.w, box2.h, diffSpec.min, diffSpec.max, diffSpec.unit, diffSpec.palette, S);
-  }
-
   function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
@@ -541,9 +488,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
   // ---------- payload / params ----------
   const initial = {
     mapUrl:"", mapUrl2:"", mapUrl3:"", title:"", subtitle:"", vmin:"", vmax:"", unit:"", palette:"",
-    // Optional per-mode legend descriptors from the visor (preferred when present)
-    legendMain:null,
-    legendDiff:null,
     scaleKm:"", scalePx:"", footer:"", filename:"poster.png",
     bbox:null,
     dims:null
@@ -602,14 +546,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
           initial.unit = payload.meta.unit || "";
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
-        }
-
-        // Prefer explicit legend descriptors when provided by the visor (3-map mode)
-        if(payload.legendMain && typeof payload.legendMain === 'object'){
-          initial.legendMain = payload.legendMain;
-        }
-        if(payload.legendDiff && typeof payload.legendDiff === 'object'){
-          initial.legendDiff = payload.legendDiff;
         }
         const f = [
           payload.meta?.island || "",
@@ -805,7 +741,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     // poster aspect ratio
     const outW = posterW;
     const arSel = ($("posterAR") && $("posterAR").value) ? $("posterAR").value : "poster";
-    const posterAR = arSel;
     const ratio = (arSel==="a4_land") ? (2480/3508) : (arSel==="a4_port") ? (3508/2480) : 1.18;
     const outH = Math.round(outW * ratio);
     setCanvasSize(outW,outH);
@@ -904,7 +839,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     // frame (no extra "sky" background; the sea already comes from the GEE PNG)
     // keep a subtle rounded frame + border only
-    ctx.fillStyle = "#cfe8f3";
+    ctx.fillStyle = "#ffffff";
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
 
@@ -930,7 +865,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     } else {
       // 3-map layout inside the same frame
       const isLand = (posterAR==="a4_land");
-      const gapIn = Math.round(34*S);
+      const gapIn = Math.round(22*S);
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
         for(let i=0;i<3;i++){
@@ -938,17 +873,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const sy = innerY;
           const sw = slotW;
           const sh = innerH;
-          // panel frame for each map (more evident separation)
-          ctx.save();
-          ctx.fillStyle = "#ffffff";
-          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-          ctx.fill();
-          ctx.strokeStyle = "rgba(0,0,0,0.14)";
-          ctx.lineWidth = Math.max(1, Math.round(2*S));
-          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-          ctx.stroke();
-          ctx.restore();
-
           const im = imgs[i];
           const arS = im.width / im.height;
           const tar = sw/sh;
@@ -959,8 +883,20 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
           ctx.save();
-          ctx.beginPath(); drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S)); ctx.clip();
-          ctx.drawImage(im, dX, dY, dW, dH);
+          // panel per map
+          const rP = Math.round(18*S);
+          ctx.fillStyle = "#ffffff";
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.14)";
+          ctx.lineWidth = Math.max(1, Math.round(2*S));
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.stroke();
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.clip();
+          const bleed = Math.max(1, Math.round(2*S));
+
+          ctx.drawImage(im, dX-bleed, dY-bleed, dW+bleed*2, dH+bleed*2);
           ctx.restore();
           // label
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
@@ -973,17 +909,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const sy = innerY + i*(slotH + gapIn);
           const sw = innerW;
           const sh = slotH;
-          // panel frame for each map (more evident separation)
-          ctx.save();
-          ctx.fillStyle = "#ffffff";
-          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-          ctx.fill();
-          ctx.strokeStyle = "rgba(0,0,0,0.14)";
-          ctx.lineWidth = Math.max(1, Math.round(2*S));
-          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
-          ctx.stroke();
-          ctx.restore();
-
           const im = imgs[i];
           const arS = im.width / im.height;
           const tar = sw/sh;
@@ -994,8 +919,20 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
           ctx.save();
-          ctx.beginPath(); drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S)); ctx.clip();
-          ctx.drawImage(im, dX, dY, dW, dH);
+          // panel per map
+          const rP = Math.round(18*S);
+          ctx.fillStyle = "#ffffff";
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.14)";
+          ctx.lineWidth = Math.max(1, Math.round(2*S));
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.stroke();
+          drawRoundedRect(ctx, sx, sy, sw, sh, rP);
+          ctx.clip();
+          const bleed = Math.max(1, Math.round(2*S));
+
+          ctx.drawImage(im, dX-bleed, dY-bleed, dW+bleed*2, dH+bleed*2);
           ctx.restore();
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
@@ -1034,13 +971,12 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
         }
       }
     if(showLegend){
-      const hasDiffLegend = !!(initial.legendDiff && Array.isArray(initial.legendDiff.palette) && initial.legendDiff.palette.length);
-      const legW = Math.min(Math.round(900*S), Math.round(mapW * 0.60));
-      const legH = hasDiffLegend ? Math.round(170*S) : Math.round(140*S);
+      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
+      const legH = Math.round(140*S);
       const legMargin = Math.round(26*S);
 
       // Base position by side
-      let legX = (legendSide==="left")
+      const legX = (legendSide==="left")
         ? (mapX + legMargin)
         : (mapX + mapW - legW - legMargin);
 
@@ -1064,25 +1000,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       }
       setLegendRect(legX, legY, legW, legH);
 
-      const mainSpec = (initial.legendMain && Array.isArray(initial.legendMain.palette) && initial.legendMain.palette.length)
-        ? {
-            min: initial.legendMain.min,
-            max: initial.legendMain.max,
-            unit: initial.legendMain.unit || (unit || t("legend")),
-            palette: initial.legendMain.palette
-          }
-        : { min: vmin, max: vmax, unit: (unit || t("legend")), palette: palette };
-
-      const diffSpec = (hasDiffLegend)
-        ? {
-            min: initial.legendDiff.min,
-            max: initial.legendDiff.max,
-            unit: initial.legendDiff.unit || "Δ (B−A)",
-            palette: initial.legendDiff.palette
-          }
-        : null;
-
-      drawLegendGroup(ctx, legX, legY, legW, legH, mainSpec, diffSpec, S);
+      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
     }
 
     if(showFooter){
@@ -1119,29 +1037,6 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     }catch(e){
       setErr(t("dlFail") + e);
     }
-  }
-
-
-  // Legend drag state (for free positioning)
-  const legendDragState = { x:null, y:null, w:0, h:0, dragging:false, dx:0, dy:0 };
-
-  function setLegendRect(x, y, w, h){
-    // Keep last drawn legend rectangle for hit-testing & dragging
-    legendDragState.w = w || 0;
-    legendDragState.h = h || 0;
-    // When drag is enabled for the first time, initialize position to the current computed placement
-    if(legendEnabled() && (legendDragState.x===null || legendDragState.y===null)){
-      legendDragState.x = x;
-      legendDragState.y = y;
-    }
-  }
-
-
-
-  function legendEnabled(){
-    const show = ($("showLegend") && $("showLegend").checked);
-    const drag = ($("legendDrag") && $("legendDrag").checked);
-    return !!(show && drag);
   }
 
   // wire
