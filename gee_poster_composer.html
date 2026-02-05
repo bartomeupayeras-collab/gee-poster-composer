@@ -68,6 +68,12 @@
       border-radius: var(--radius);
       display:block;
     }
+  
+    details.debug{border:1px solid var(--line);border-radius:12px;background:var(--soft);padding:10px 12px;margin-top:10px}
+    details.debug > summary{cursor:pointer;font-weight:650;color:#111;list-style:none}
+    details.debug > summary::-webkit-details-marker{display:none}
+    details.debug[open]{background:#fff}
+
   </style>
 </head>
 <body>
@@ -104,7 +110,8 @@
   <div class="grid">
     <section class="card">
       <div class="pad">
-        <label id="labMap"></label>
+        <details id="debugBlock" class="debug"><summary id="sumDebug">Enllaços del mapa (debug)</summary>
+<label id="labMap"></label>
         <input id="mapUrl" placeholder="" />
 
         <div class="row" style="margin-top:10px">
@@ -188,7 +195,9 @@
           <span id="advTitle"></span>
 </summary>
         <div class="pad">
-          <label id="labTitle"></label>
+          <label 
+</details>
+id="labTitle"></label>
           <input id="title" />
 
           <label id="labSubtitle"></label>
@@ -864,7 +873,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
     } else {
       // 3-map layout inside the same frame
-      const isLand = (posterAR==="a4_land");
+      const isLand = (arSel==="a4_land");
       const gapIn = Math.round(14*S);
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
@@ -1015,7 +1024,24 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     }
   }
 
-  // wire
+  
+  // --- draggable legend state ---
+  const legendDragState = {x:null,y:null,w:0,h:0,dragging:false,dx:0,dy:0};
+  function setLegendRect(x,y,w,h){
+    legendDragState.w=w; legendDragState.h=h;
+    // only set initial position when not already dragged
+    if(legendDragState.x===null || legendDragState.y===null){
+      legendDragState.x=x; legendDragState.y=y;
+    }
+  }
+  function legendEnabled(){
+    // enabled only if legend is shown and drag mode is ON
+    const drag = $("legendDrag") ? $("legendDrag").checked : false;
+    const show = $("showLegend") ? $("showLegend").checked : false;
+    return !!(drag && show);
+  }
+
+// wire
   $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
   $("legendDrag").addEventListener("change", () => {
