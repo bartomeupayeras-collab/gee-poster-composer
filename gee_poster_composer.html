@@ -484,8 +484,9 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
   }
 
   // Draw one or two legends (main + optional Δ) inside a single draggable box.
+  // If Δ exists, we place the two legends SIDE-BY-SIDE to reduce height and avoid covering the map.
   function drawLegendGroup(ctx,x,y,w,h,mainSpec,diffSpec,S){
-    // Container
+    // Outer container
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
@@ -502,6 +503,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     const innerX = x + pad;
     const innerY = y + pad;
     const innerW = w - pad*2;
+    const innerH = h - pad*2;
     const hasDiff = !!(diffSpec && diffSpec.palette && diffSpec.palette.length);
 
     if(!hasDiff){
@@ -509,16 +511,13 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       return;
     }
 
-    // Split vertically: main (top) + diff (bottom)
-    const gap = Math.round(10*S);
-    const halfH = Math.floor((h - pad*2 - gap)/2);
+    // Split HORIZONTALLY: main (left) + diff (right)
+    const gap = Math.round(12*S);
+    const halfW = Math.floor((innerW - gap)/2);
 
-    const box1 = {x: innerX, y: innerY, w: innerW, h: halfH};
-    const box2 = {x: innerX, y: innerY + halfH + gap, w: innerW, h: halfH};
+    const box1 = {x: innerX, y: innerY, w: halfW, h: innerH};
+    const box2 = {x: innerX + halfW + gap, y: innerY, w: halfW, h: innerH};
 
-    // We reuse drawLegend but without its own container:
-    // simplest safe approach: call drawLegend on sub-rectangles, but it draws its own rounded container.
-    // That's ok visually; it yields two small cards inside the outer card.
     drawLegend(ctx, box1.x, box1.y, box1.w, box1.h, mainSpec.min, mainSpec.max, mainSpec.unit, mainSpec.palette, S);
     drawLegend(ctx, box2.x, box2.y, box2.w, box2.h, diffSpec.min, diffSpec.max, diffSpec.unit, diffSpec.palette, S);
   }
@@ -931,7 +930,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     } else {
       // 3-map layout inside the same frame
       const isLand = (posterAR==="a4_land");
-      const gapIn = Math.round(14*S);
+      const gapIn = Math.round(34*S);
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
         for(let i=0;i<3;i++){
@@ -939,6 +938,17 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const sy = innerY;
           const sw = slotW;
           const sh = innerH;
+          // panel frame for each map (more evident separation)
+          ctx.save();
+          ctx.fillStyle = "#ffffff";
+          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.14)";
+          ctx.lineWidth = Math.max(1, Math.round(2*S));
+          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
+          ctx.stroke();
+          ctx.restore();
+
           const im = imgs[i];
           const arS = im.width / im.height;
           const tar = sw/sh;
@@ -949,25 +959,14 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
           ctx.save();
-          ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+          ctx.beginPath(); drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S)); ctx.clip();
           ctx.drawImage(im, dX, dY, dW, dH);
           ctx.restore();
           // label
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
-          // separator between maps
-          if(i<2){
-            ctx.save();
-            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-            ctx.lineWidth = Math.max(1, Math.round(2*S));
-            const xSep = sx + sw + gapIn/2;
-            ctx.beginPath();
-            ctx.moveTo(xSep, sy + Math.round(10*S));
-            ctx.lineTo(xSep, sy + sh - Math.round(10*S));
-            ctx.stroke();
-            ctx.restore();
-          }
         }
+      }
       } else {
         const slotH = (innerH - gapIn*2)/3;
         for(let i=0;i<3;i++){
@@ -975,6 +974,17 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const sy = innerY + i*(slotH + gapIn);
           const sw = innerW;
           const sh = slotH;
+          // panel frame for each map (more evident separation)
+          ctx.save();
+          ctx.fillStyle = "#ffffff";
+          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.14)";
+          ctx.lineWidth = Math.max(1, Math.round(2*S));
+          drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S));
+          ctx.stroke();
+          ctx.restore();
+
           const im = imgs[i];
           const arS = im.width / im.height;
           const tar = sw/sh;
@@ -985,23 +995,11 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           const cX=dX+dW/2, cY=dY+dH/2;
           dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
           ctx.save();
-          ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+          ctx.beginPath(); drawRoundedRect(ctx, sx, sy, sw, sh, Math.round(18*S)); ctx.clip();
           ctx.drawImage(im, dX, dY, dW, dH);
           ctx.restore();
           const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
-          // separator between maps
-          if(i<2){
-            ctx.save();
-            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
-            ctx.lineWidth = Math.max(1, Math.round(2*S));
-            const ySep = sy + sh + gapIn/2;
-            ctx.beginPath();
-            ctx.moveTo(sx + Math.round(10*S), ySep);
-            ctx.lineTo(sx + sw - Math.round(10*S), ySep);
-            ctx.stroke();
-            ctx.restore();
-          }
         }
       }
     }
@@ -1038,8 +1036,8 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       }
     if(showLegend){
       const hasDiffLegend = !!(initial.legendDiff && Array.isArray(initial.legendDiff.palette) && initial.legendDiff.palette.length);
-      const legW = Math.min(Math.round(620*S), Math.round(mapW * 0.42));
-      const legH = hasDiffLegend ? Math.round(320*S) : Math.round(140*S);
+      const legW = Math.min(Math.round(900*S), Math.round(mapW * 0.60));
+      const legH = hasDiffLegend ? Math.round(170*S) : Math.round(140*S);
       const legMargin = Math.round(26*S);
 
       // Base position by side
