@@ -231,6 +231,27 @@
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
 
+  // ---------- legend helpers (FIX) ----------
+  // Whether legend is enabled (checkbox)
+  const legendEnabled = () => {
+    const el = $("showLegend");
+    return !!(el && el.checked);
+  };
+
+  // Drag state + last drawn legend rect (for hit-testing)
+  const legendDragState = {
+    x: null, y: null, w: 0, h: 0,
+    dragging: false, dx: 0, dy: 0
+  };
+
+  const setLegendRect = (x, y, w, h) => {
+    legendDragState.x = x;
+    legendDragState.y = y;
+    legendDragState.w = w;
+    legendDragState.h = h;
+  };
+
+
   // ---------- i18n ----------
   const I18N = {
     ca: {
