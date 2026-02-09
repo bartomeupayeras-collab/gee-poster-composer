@@ -294,7 +294,8 @@
     var wKm = bboxWidthKm(bbox);
     if (!wKm || !mapWidthPx || mapWidthPx <= 0) return {km: 1, px: 60};
     var kmPerPx = wKm / mapWidthPx;
-    var targetPx = Math.max(60, mapWidthPx * 0.25);
+    var targetPx = mapWidthPx * 0.30;
+    targetPx = Math.max(mapWidthPx * 0.12, Math.min(mapWidthPx * 0.45, targetPx));
     var targetKm = targetPx * kmPerPx;
     var km = niceDistanceKm(targetKm);
     var px = km / kmPerPx;
@@ -316,17 +317,17 @@
     var sb = computeScaleBar(bbox, mapRect.w);
     // draw bar
     ctx.save();
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.lineTo(x + sb.px, y);
     ctx.stroke();
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(x, y-6); ctx.lineTo(x, y+6);
-    ctx.moveTo(x+sb.px, y-6); ctx.lineTo(x+sb.px, y+6);
+    ctx.moveTo(x, y-8); ctx.lineTo(x, y+8);
+    ctx.moveTo(x+sb.px, y-8); ctx.lineTo(x+sb.px, y+8);
     ctx.stroke();
-    ctx.font = '14px Arial';
+    ctx.font = '15px Arial';
     ctx.textBaseline = 'bottom';
     ctx.fillText(Math.round(sb.km) + ' km', x, y-8);
     ctx.restore();
