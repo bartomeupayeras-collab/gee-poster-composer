@@ -478,6 +478,21 @@ $("labSubtitle").textContent = t("subtitle");
     ctx.restore();
   }
 
+  // Fix common UTF-8/Latin1 mojibake coming from URL/query decoding
+  // e.g. "Î” (Bâˆ’A)" -> "Δ (B−A)"
+  function fixMojibake(s){
+    if(s===null || s===undefined) return s;
+    s = String(s);
+    try { return decodeURIComponent(escape(s)); } catch(e) { return s; }
+  }
+  function cleanText(s){
+    if(s===null || s===undefined) return s;
+    // run twice to handle double-encoded edge cases
+    const once = fixMojibake(s);
+    const twice = fixMojibake(once);
+    return twice;
+  }
+
 
   function normalizeColor(c){
     if(!c) return c;
@@ -512,7 +527,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     ctx.font="900 "+Math.round(26*S)+"px system-ui, sans-serif";
     ctx.textAlign="left";
     ctx.textBaseline="top";
-    ctx.fillText(unit || t("legend"), x+pad, y+Math.round(10*S));
+    ctx.fillText(cleanText(unit || t("legend")), x+pad, y+Math.round(10*S));
 
     const barX=x+pad, barY=y+Math.round(56*S), barW=w-(pad*2), barH=Math.round(16*S);
     const grad=ctx.createLinearGradient(barX,0,barX+barW,0);
@@ -1120,11 +1135,11 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
 
       // Main legend + optional Δ legend (side-by-side)
       if(diffLegendRaw && Array.isArray(diffLegendRaw.palette)){
-        const mainL = { vmin, vmax, unit: (unit||t("legend")), palette };
+        const mainL = { vmin, vmax, unit: cleanText(unit||t("legend")), palette };
         const diffL = {
           vmin: (diffLegendRaw.min!==undefined? String(diffLegendRaw.min): (diffLegendRaw.vmin!==undefined? String(diffLegendRaw.vmin): "")),
           vmax: (diffLegendRaw.max!==undefined? String(diffLegendRaw.max): (diffLegendRaw.vmax!==undefined? String(diffLegendRaw.vmax): "")),
-          unit: (diffLegendRaw.unit || diffLegendRaw.title || "Δ (B − A)"),
+          unit: cleanText(diffLegendRaw.unit || diffLegendRaw.title || "Δ (B − A)"),
           palette: normalizePalette(diffLegendRaw.palette)
         };
         // Wider box when we have 2 legends
