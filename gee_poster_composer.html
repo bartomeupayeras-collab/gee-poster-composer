@@ -247,6 +247,21 @@
 </main>
 
 <script>
+
+  // ------------------------------------------------------------
+  // Text cleanup (fix mojibake like "Î" for "Δ" and "âˆ’" for "−")
+  // ------------------------------------------------------------
+  function fixText(s) {
+    if (s === null || s === undefined) return '';
+    s = String(s);
+    // Fast path: if it contains common mojibake markers, try to recover.
+    if (/[ÃÂÎâ]/.test(s)) {
+      try { s = decodeURIComponent(escape(s)); } catch (e) {}
+    }
+    // Normalize spaces
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
 (() => {
   const $ = (id) => document.getElementById(id);
   const qs = (k) => new URLSearchParams(location.search).get(k);
