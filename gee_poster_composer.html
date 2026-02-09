@@ -194,6 +194,26 @@
           <label id="labSubtitle"></label>
           <textarea id="subtitle"></textarea>
 
+          <div id="labelsBox" style="display:none; margin-top:12px">
+            <label id="labMapLabels"></label>
+            <div class="row">
+              <div style="flex:1">
+                <label id="labMapLabel1"></label>
+                <input id="mapLabel1" />
+              </div>
+              <div style="flex:1">
+                <label id="labMapLabel2"></label>
+                <input id="mapLabel2" />
+              </div>
+              <div style="flex:1">
+                <label id="labMapLabel3"></label>
+                <input id="mapLabel3" />
+              </div>
+            </div>
+            <div class="hint" id="mapLabelsHint" style="margin-top:6px"></div>
+          </div>
+
+
           
           <!-- hidden advanced fields (kept for payload compatibility) -->
           <input id="vmin" type="hidden" />
@@ -267,6 +287,7 @@
       missingMap:"Falta l'URL del mapa (PNG).",
       loadFail:"No s'ha pogut carregar el PNG del mapa.\n\n• Revisa que l'URL sigui correcte i no hagi expirat.\n• Pot ser CORS o permissos.\n\nProva d'obrir l'URL en una pestanya nova: si no es veu, l'URL és invàlid o ha expirat.",
       dlFail:"No s'ha pogut exportar el canvas a PNG.\n\nAixò sol ser 'tainted canvas' per CORS.\nDetall:\n",
+      mapLabelsTitle:"Etiquetes dels mapes", mapLabel1:"Etiqueta mapa 1", mapLabel2:"Etiqueta mapa 2", mapLabel3:"Etiqueta mapa 3", mapLabelsHint:"Canvia el text de les etiquetes que apareixen a dalt de cada mapa (només en composicions de 3 mapes).",
       left:"Esquerra", right:"Dreta",
     },
     es: {
@@ -282,6 +303,7 @@
       missingMap:"Falta la URL del mapa (PNG).",
       loadFail:"No se ha podido cargar el PNG del mapa.\n\n• Revisa que la URL sea correcta y no haya expirado.\n• Puede ser CORS o permisos.\n\nPrueba a abrir la URL en una pestaña nueva: si no se ve, la URL es inválida o ha expirado.",
       dlFail:"No se ha podido exportar el canvas a PNG.\n\nEsto suele ser 'tainted canvas' por CORS.\nDetalle:\n",
+      mapLabelsTitle:"Etiquetas de los mapas", mapLabel1:"Etiqueta mapa 1", mapLabel2:"Etiqueta mapa 2", mapLabel3:"Etiqueta mapa 3", mapLabelsHint:"Cambia el texto de las etiquetas que aparecen arriba de cada mapa (solo en composiciones de 3 mapas).",
       left:"Izquierda", right:"Derecha",
     },
     en: {
@@ -297,6 +319,7 @@
       loadFail:"Couldn't load the map PNG.\n\n• Check the URL is correct and not expired.\n• It may be CORS/permissions.\n\nTry opening the URL in a new tab: if it doesn’t show, the URL is invalid or expired.",
       dlFail:"Couldn't export the canvas to PNG.\n\nThis is usually a CORS 'tainted canvas'.\nDetail:\n",
       legendPos:"Legend position", scalePos:"Scale position",
+      mapLabelsTitle:"Map labels", mapLabel1:"Map label 1", mapLabel2:"Map label 2", mapLabel3:"Map label 3", mapLabelsHint:"Edit the labels shown at the top of each map (only for 3‑map compositions).",
       left:"Left", right:"Right",
     }
   };
@@ -344,7 +367,13 @@
     $("advTitle").textContent = t("adv");
     if($("advSub")) $("advSub").textContent = t("advSub");
     $("labTitle").textContent = t("title");
-    $("labSubtitle").textContent = t("subtitle");
+$("labSubtitle").textContent = t("subtitle");
+
+    if($("labMapLabels")) $("labMapLabels").textContent = t("mapLabelsTitle");
+    if($("labMapLabel1")) $("labMapLabel1").textContent = t("mapLabel1");
+    if($("labMapLabel2")) $("labMapLabel2").textContent = t("mapLabel2");
+    if($("labMapLabel3")) $("labMapLabel3").textContent = t("mapLabel3");
+    if($("mapLabelsHint")) $("mapLabelsHint").textContent = t("mapLabelsHint");
     if($("labMin")) $("labMin").textContent = t("min");
     if($("labMax")) $("labMax").textContent = t("max");
     if($("labUnit")) $("labUnit").textContent = t("unit");
@@ -449,7 +478,22 @@
     ctx.restore();
   }
 
+
+  function normalizeColor(c){
+    if(!c) return c;
+    c = String(c).trim();
+    // hex without '#'
+    if(/^[0-9a-fA-F]{6}$/.test(c)) return "#" + c;
+    if(/^[0-9a-fA-F]{3}$/.test(c)) return "#" + c;
+    return c;
+  }
+  function normalizePalette(pal){
+    if(!Array.isArray(pal)) return [];
+    return pal.map(normalizeColor);
+  }
+
 function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
+    palette = normalizePalette(palette);
     ctx.save();
     ctx.globalAlpha=.98;
     ctx.fillStyle="#fff";
@@ -490,6 +534,17 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 
     ctx.restore();
   }
+
+
+  function drawLegendPair(ctx,x,y,w,h,main,diff,S){
+    // side-by-side legends inside one overall box footprint
+    const gap = Math.round(14*S);
+    const wEach = Math.max(10, Math.floor((w - gap)/2));
+    const hEach = h;
+    drawLegend(ctx, x, y, wEach, hEach, main.vmin, main.vmax, main.unit, main.palette, S);
+    drawLegend(ctx, x + wEach + gap, y, wEach, hEach, diff.vmin, diff.vmax, diff.unit, diff.palette, S);
+  }
+
   function drawScaleBar(ctx,x,y,widthPx,label,S){
     ctx.save();
     ctx.fillStyle="#111";
@@ -529,6 +584,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
             catch(_e3){ payload=JSON.parse(atob(decodeURIComponent(p))); }
           }
         }
+        window.__PAYLOAD = payload;
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         // Support multi-map payloads (3 maps): payload.maps = [{dataUrl|mapUrl|url}, ...]
         if (Array.isArray(payload.maps) && payload.maps.length) {
@@ -540,7 +596,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           initial.mapUrl  = getU(payload.maps[0]) || initial.mapUrl;
           initial.mapUrl2 = getU(payload.maps[1]);
           initial.mapUrl3 = getU(payload.maps[2]);
-          // If the launcher also provides labels, keep them in DOM (render reads from qs('p'))
+          if (Array.isArray(payload.labels)) { initial.labels = payload.labels; }
         }
         // Optional: map bbox & dims for a real scale bar
         if(payload.bbox && isFinite(payload.bbox.w) && isFinite(payload.bbox.e) && isFinite(payload.bbox.s) && isFinite(payload.bbox.n)){
@@ -592,6 +648,12 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     setIf("mapUrl", initial.mapUrl);
     setIf("mapUrl2", initial.mapUrl2);
     setIf("mapUrl3", initial.mapUrl3);
+
+    // Map labels (only shown for 3-map compositions)
+    setIf("mapLabel1", (initial.labels && initial.labels[0]) ? String(initial.labels[0]) : "");
+    setIf("mapLabel2", (initial.labels && initial.labels[1]) ? String(initial.labels[1]) : "");
+    setIf("mapLabel3", (initial.labels && initial.labels[2]) ? String(initial.labels[2]) : "");
+
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
     setIf("vmin", initial.vmin);
@@ -601,6 +663,11 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     setIf("scaleKm", initial.scaleKm);
     setIf("scalePx", initial.scalePx || "180");
     setIf("footer", initial.footer);
+
+
+    // Show/hide map label editor (only meaningful when we have 3 maps)
+    const has3 = ((initial.mapUrl2||"").trim() && (initial.mapUrl3||"").trim());
+    if($("labelsBox")) $("labelsBox").style.display = has3 ? "block" : "none";
 
     $("fn").textContent = initial.filename || "";
   }
@@ -728,7 +795,19 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           }
         }
       })();
-      const mapLabels = (payloadForLabels && Array.isArray(payloadForLabels.labels)) ? payloadForLabels.labels : null;
+      const payloadLabels = (payloadForLabels && Array.isArray(payloadForLabels.labels)) ? payloadForLabels.labels : null;
+// Prefer user-edited labels if provided
+const inputLabels = [
+  ($("mapLabel1")? ($("mapLabel1").value||"").trim() : ""),
+  ($("mapLabel2")? ($("mapLabel2").value||"").trim() : ""),
+  ($("mapLabel3")? ($("mapLabel3").value||"").trim() : "")
+];
+const hasInputLabels = inputLabels.some(v => v.length);
+const mapLabels = hasInputLabels ? inputLabels : payloadLabels;
+
+// Optional diff legend from payload (for A/B + Δ modes)
+const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadForLabels.legendDiff : null;
+
       if(!mapUrl){
         setErr(t("missingMap"));
         return;
@@ -1039,7 +1118,20 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       }
       setLegendRect(legX, legY, legW, legH);
 
-      drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      // Main legend + optional Δ legend (side-by-side)
+      if(diffLegendRaw && Array.isArray(diffLegendRaw.palette)){
+        const mainL = { vmin, vmax, unit: (unit||t("legend")), palette };
+        const diffL = {
+          vmin: (diffLegendRaw.min!==undefined? String(diffLegendRaw.min): (diffLegendRaw.vmin!==undefined? String(diffLegendRaw.vmin): "")),
+          vmax: (diffLegendRaw.max!==undefined? String(diffLegendRaw.max): (diffLegendRaw.vmax!==undefined? String(diffLegendRaw.vmax): "")),
+          unit: (diffLegendRaw.unit || diffLegendRaw.title || "Δ (B − A)"),
+          palette: normalizePalette(diffLegendRaw.palette)
+        };
+        // Wider box when we have 2 legends
+        drawLegendPair(ctx, legX, legY, legW, legH, mainL, diffL, S);
+      } else {
+        drawLegend(ctx, legX, legY, legW, legH, vmin, vmax, unit, palette, S);
+      }
     }
 
     if(showFooter){
@@ -1081,6 +1173,16 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
   // wire
   $("btnRender").addEventListener("click", render);
   $("btnDownload").addEventListener("click", download);
+
+  ["mapLabel1","mapLabel2","mapLabel3"].forEach(id=>{
+    const el = $(id);
+    if(!el) return;
+    el.addEventListener("input", ()=>{
+      // Only re-render if a map is loaded
+      if(($("mapUrl").value||"").trim()) render();
+    });
+  });
+
   $("legendDrag").addEventListener("change", () => {
     if(!$("legendDrag").checked){
       legendDragState.x = null;
