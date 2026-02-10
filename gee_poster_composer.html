@@ -568,7 +568,7 @@ $("labSubtitle").textContent = t("subtitle");
     const bx = x + w/2 - boxW/2;
     const by = y + Math.round(12*S);
     ctx.globalAlpha = 0.92;
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = SEA_BG;
     drawRoundedRect(ctx, bx, by, boxW, boxH, Math.round(14*S));
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -1067,26 +1067,27 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     const mapW = W - pad*2;
     const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
 
-    // inner padding so the map content never touches the frame
-    const inset = Math.round(18*S);
+    // palette/background for unused areas (match the sea tone so there are no "white bars")
+    const SEA_BG = "#cfe7f2";
+
+    // inner padding (keep it minimal so the map uses the maximum space)
+    const inset = Math.round(2*S);
     const innerX = mapX + inset;
     const innerY = mapY + inset;
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // fill the available map area (cover) to avoid white side bars
+    // compute draw rect for the single-map case (cover, centered)
     const im0 = imgs[0];
-    const scale0 = Math.max(innerW / im0.width, innerH / im0.height);
+    const scale0 = Math.max(innerW / im0.width, innerH / im0.height); // cover
     let drawW = im0.width * scale0;
     let drawH = im0.height * scale0;
     let dx = innerX + (innerW - drawW) / 2;
     let dy = innerY + (innerH - drawH) / 2;
 
     // frame + clip
-
-    // frame (no extra "sky" background; the sea already comes from the GEE PNG)
-    // keep a subtle rounded frame + border only
-    ctx.fillStyle = "#ffffff";
+    // Fill with sea tone so any leftover space looks natural (not white)
+    ctx.fillStyle = SEA_BG;
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.fill();
 
@@ -1095,22 +1096,10 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
-    
-    // Slight zoom-in, but clamp so we don't crop when aspect ratios differ a lot
-    let ZOOM = 1.12;
-    const maxZoomNoCrop = Math.min(mapW / drawW, mapH / drawH);
-    if (isFinite(maxZoomNoCrop) && maxZoomNoCrop > 0) {
-      ZOOM = Math.min(ZOOM, maxZoomNoCrop * 0.995);
-    }
-    const cx = dx + drawW/2;
-    const cy = dy + drawH/2;
-    drawW = drawW * ZOOM;
-    drawH = drawH * ZOOM;
-    dx = cx - drawW/2;
-    dy = cy - drawH/2;
-
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
+(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
     if(imgs.length===1){
       ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
@@ -1127,8 +1116,14 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = slotW;
           const sh = innerH;
           const im = imgs[i];
-          // fill each slot (cover) so the map uses all available space
-          const scale = Math.max(sw / im.width, sh / im.height);
+          // Fit policy: use 'cover' only when it would barely crop; otherwise fall back to 'contain'
+          const scaleCover = Math.max(sw / im.width, sh / im.height);
+          const dWc = im.width * scaleCover;
+          const dHc = im.height * scaleCover;
+          const cropFrac = 1 - ((sw * sh) / Math.max(1, (dWc * dHc))); // 0..1
+          const useCover = (isFinite(cropFrac) && cropFrac >= 0) ? (cropFrac < 0.06) : true;
+
+          const scale = useCover ? scaleCover : Math.min(sw / im.width, sh / im.height); // contain if crop would be noticeable
           let dW = im.width * scale;
           let dH = im.height * scale;
           let dX = sx + (sw - dW) / 2;
@@ -1136,7 +1131,7 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = SEA_BG;
           drawRoundedRect(ctx, sx, sy, sw, sh, rP);
           ctx.fill();
           ctx.strokeStyle = "rgba(0,0,0,0.14)";
@@ -1161,8 +1156,14 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = innerW;
           const sh = slotH;
           const im = imgs[i];
-          // fill each slot (cover) so the map uses all available space
-          const scale = Math.max(sw / im.width, sh / im.height);
+          // Fit policy: use 'cover' only when it would barely crop; otherwise fall back to 'contain'
+          const scaleCover = Math.max(sw / im.width, sh / im.height);
+          const dWc = im.width * scaleCover;
+          const dHc = im.height * scaleCover;
+          const cropFrac = 1 - ((sw * sh) / Math.max(1, (dWc * dHc))); // 0..1
+          const useCover = (isFinite(cropFrac) && cropFrac >= 0) ? (cropFrac < 0.06) : true;
+
+          const scale = useCover ? scaleCover : Math.min(sw / im.width, sh / im.height); // contain if crop would be noticeable
           let dW = im.width * scale;
           let dH = im.height * scale;
           let dX = sx + (sw - dW) / 2;
@@ -1170,7 +1171,7 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = SEA_BG;
           drawRoundedRect(ctx, sx, sy, sw, sh, rP);
           ctx.fill();
           ctx.strokeStyle = "rgba(0,0,0,0.14)";
