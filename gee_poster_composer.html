@@ -1077,10 +1077,10 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     // fill the available map area (cover) to avoid white side bars
     const im0 = imgs[0];
     const scale0 = Math.max(innerW / im0.width, innerH / im0.height);
-    const drawW = im0.width * scale0;
-    const drawH = im0.height * scale0;
-    const dx = innerX + (innerW - drawW) / 2;
-    const dy = innerY + (innerH - drawH) / 2;
+    let drawW = im0.width * scale0;
+    let drawH = im0.height * scale0;
+    let dx = innerX + (innerW - drawW) / 2;
+    let dy = innerY + (innerH - drawH) / 2;
 
     // frame + clip
 
