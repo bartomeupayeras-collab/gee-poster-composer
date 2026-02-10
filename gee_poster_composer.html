@@ -794,6 +794,136 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
   const canvas = $("c");
   const ctx = canvas.getContext("2d");
 
+// ---------- smart fit (maximize feature without cropping) ----------
+// We estimate a "content bbox" inside each PNG by ignoring the most common edge background colors
+// (typically sea + land mask). Then we choose the maximum scale that still keeps that content bbox
+// fully visible inside the slot (no crop), while filling as much space as possible.
+const _CONTENT_BBOX_CACHE = new WeakMap();
+
+function _quant16_(v){ return Math.max(0, Math.min(255, (v/16|0)*16)); }
+function _key_(r,g,b){ return _quant16_(r) + "," + _quant16_(g) + "," + _quant16_(b); }
+function _dist_(r1,g1,b1,r2,g2,b2){
+  const dr=r1-r2, dg=g1-g2, db=b1-b2;
+  return Math.sqrt(dr*dr+dg*dg+db*db);
+}
+
+function computeContentBBox(img){
+  if(_CONTENT_BBOX_CACHE.has(img)) return _CONTENT_BBOX_CACHE.get(img);
+  try{
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h);
+
+    // 1) find the two most common colors along the edges (background candidates)
+    const ed = g.getImageData(0, 0, w, h).data;
+
+    const counts = new Map();
+    const step = Math.max(1, Math.round(Math.min(w,h)/500)); // adaptive sampling
+    function addPix(ix){
+      const r=ed[ix], gg=ed[ix+1], b=ed[ix+2], a=ed[ix+3];
+      if(a < 10) return;
+      const k=_key_(r,gg,b);
+      counts.set(k, (counts.get(k)||0)+1);
+    }
+    // sample edges
+    for(let x=0;x<w;x+=step){
+      addPix((0*w + x)*4);
+      addPix(((h-1)*w + x)*4);
+    }
+    for(let y=0;y<h;y+=step){
+      addPix((y*w + 0)*4);
+      addPix((y*w + (w-1))*4);
+    }
+
+    const top = [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>e[0]);
+    function parseKey(k){ const p=k.split(',').map(Number); return {r:p[0], g:p[1], b:p[2]}; }
+    const bg1 = top[0] ? parseKey(top[0]) : {r:210,g:235,b:245};
+    const bg2 = top[1] ? parseKey(top[1]) : {r:240,g:240,b:240};
+
+    // 2) scan for "content": pixels far from both backgrounds OR very dark outline pixels
+    let minx=w, miny=h, maxx=0, maxy=0, found=false;
+    const scanStep = Math.max(1, Math.round(Math.min(w,h)/600)); // faster scan
+    const thr = 34; // background distance threshold
+    for(let y=0;y<h;y+=scanStep){
+      for(let x=0;x<w;x+=scanStep){
+        const i=(y*w+x)*4;
+        const r=ed[i], gg=ed[i+1], b=ed[i+2], a=ed[i+3];
+        if(a < 10) continue;
+
+        // treat near-black outlines as content
+        const isDark = (r+gg+b) < 110;
+
+        const d1=_dist_(r,gg,b,bg1.r,bg1.g,bg1.b);
+        const d2=_dist_(r,gg,b,bg2.r,bg2.g,bg2.b);
+
+        const isContent = isDark || (d1>thr && d2>thr);
+        if(isContent){
+          found=true;
+          if(x<minx) minx=x;
+          if(y<miny) miny=y;
+          if(x>maxx) maxx=x;
+          if(y>maxy) maxy=y;
+        }
+      }
+    }
+
+    // fallback: if we didn't detect content, use full image
+    if(!found){
+      minx=0; miny=0; maxx=w; maxy=h;
+    } else {
+      // pad bbox a little to include outlines and avoid "touching" edges
+      const pad = Math.round(0.02*Math.min(w,h));
+      minx=Math.max(0, minx-pad);
+      miny=Math.max(0, miny-pad);
+      maxx=Math.min(w, maxx+pad);
+      maxy=Math.min(h, maxy+pad);
+    }
+
+    const bbox = {x:minx, y:miny, w:Math.max(1, maxx-minx), h:Math.max(1, maxy-miny), imgW:w, imgH:h};
+    _CONTENT_BBOX_CACHE.set(img, bbox);
+    return bbox;
+  } catch(e){
+    const w = img.naturalWidth || img.width || 1;
+    const h = img.naturalHeight || img.height || 1;
+    const bbox = {x:0,y:0,w:w,h:h,imgW:w,imgH:h};
+    _CONTENT_BBOX_CACHE.set(img, bbox);
+    return bbox;
+  }
+}
+
+// choose the maximum safe scale between contain and cover that does NOT crop the content bbox
+function safeScaleForSlot(img, sw, sh){
+  const bb = computeContentBBox(img);
+  const iw = bb.imgW, ih = bb.imgH;
+  const sContain = Math.min(sw/iw, sh/ih);
+  const sCover   = Math.max(sw/iw, sh/ih);
+
+  // if cover would not crop content bbox, use cover
+  function fits(scale){
+    const cropW = sw/scale;
+    const cropH = sh/scale;
+    const cx = (iw - cropW)/2;
+    const cy = (ih - cropH)/2;
+    const m = 0.0; // extra margin already applied in bbox padding
+    return (cx <= bb.x-m) &&
+           (cy <= bb.y-m) &&
+           (cx+cropW >= (bb.x+bb.w)+m) &&
+           (cy+cropH >= (bb.y+bb.h)+m);
+  }
+  if(fits(sCover)) return sCover;
+
+  // binary search for maximum scale that still fits
+  let lo = sContain, hi = sCover;
+  for(let it=0; it<18; it++){
+    const mid = (lo+hi)/2;
+    if(fits(mid)) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
     canvas.width=outW*dpr;
@@ -801,15 +931,20 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
-  function loadImage(url, tryCORS=true){
-    return new Promise((resolve,reject)=>{
-      const img=new Image();
-      if(tryCORS) img.crossOrigin="anonymous";
-      img.onload=()=>resolve(img);
-      img.onerror=()=>reject(new Error("img_load_fail"));
-      img.src=url;
-    });
-  }
+  
+function loadImage(url, tryCORS=true){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    if(tryCORS) img.crossOrigin="anonymous";
+    img.onload=()=>{
+      // precompute content bbox for smart fitting
+      try{ computeContentBBox(img); } catch(e){}
+      resolve(img);
+    };
+    img.onerror=()=>reject(new Error("img_load_fail"));
+    img.src=url;
+  });
+}
 
   // Expand bbox/region in a GEE thumb URL (if editable) to avoid tight cropping.
   // If the PNG is already cropped server-side without bbox/region params, this won't help (composer can't invent pixels).
@@ -1078,13 +1213,14 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // compute draw rect for the single-map case (cover, centered)
-    const im0 = imgs[0];
-    const scale0 = Math.max(innerW / im0.width, innerH / im0.height); // cover
-    let drawW = im0.width * scale0;
-    let drawH = im0.height * scale0;
-    let dx = innerX + (innerW - drawW) / 2;
-    let dy = innerY + (innerH - drawH) / 2;
+
+// compute draw rect for the single-map case (maximize content, no cropping)
+const im0 = imgs[0];
+const scale0 = safeScaleForSlot(im0, innerW, innerH);
+let drawW = (im0.naturalWidth||im0.width) * scale0;
+let drawH = (im0.naturalHeight||im0.height) * scale0;
+let dx = innerX + (innerW - drawW) / 2;
+let dy = innerY + (innerH - drawH) / 2;
 
     // frame + clip
     // Fill with sea tone so any leftover space looks natural (not white)
@@ -1099,8 +1235,6 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
 
     ctx.save();
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
-(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
     if(imgs.length===1){
       ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
@@ -1117,18 +1251,12 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = slotW;
           const sh = innerH;
           const im = imgs[i];
-          // Fit policy: use 'cover' only when it would barely crop; otherwise fall back to 'contain'
-          const scaleCover = Math.max(sw / im.width, sh / im.height);
-          const dWc = im.width * scaleCover;
-          const dHc = im.height * scaleCover;
-          const cropFrac = 1 - ((sw * sh) / Math.max(1, (dWc * dHc))); // 0..1
-          const useCover = (isFinite(cropFrac) && cropFrac >= 0) ? (cropFrac < 0.06) : true;
-
-          const scale = useCover ? scaleCover : Math.min(sw / im.width, sh / im.height); // contain if crop would be noticeable
-          let dW = im.width * scale;
-          let dH = im.height * scale;
-          let dX = sx + (sw - dW) / 2;
-          let dY = sy + (sh - dH) / 2;
+// Fit: maximize visible content without cropping it
+const scale = safeScaleForSlot(im, sw, sh);
+let dW = (im.naturalWidth||im.width) * scale;
+let dH = (im.naturalHeight||im.height) * scale;
+let dX = sx + (sw - dW) / 2;
+let dY = sy + (sh - dH) / 2;
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
@@ -1157,18 +1285,12 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = innerW;
           const sh = slotH;
           const im = imgs[i];
-          // Fit policy: use 'cover' only when it would barely crop; otherwise fall back to 'contain'
-          const scaleCover = Math.max(sw / im.width, sh / im.height);
-          const dWc = im.width * scaleCover;
-          const dHc = im.height * scaleCover;
-          const cropFrac = 1 - ((sw * sh) / Math.max(1, (dWc * dHc))); // 0..1
-          const useCover = (isFinite(cropFrac) && cropFrac >= 0) ? (cropFrac < 0.06) : true;
-
-          const scale = useCover ? scaleCover : Math.min(sw / im.width, sh / im.height); // contain if crop would be noticeable
-          let dW = im.width * scale;
-          let dH = im.height * scale;
-          let dX = sx + (sw - dW) / 2;
-          let dY = sy + (sh - dH) / 2;
+// Fit: maximize visible content without cropping it
+const scale = safeScaleForSlot(im, sw, sh);
+let dW = (im.naturalWidth||im.width) * scale;
+let dH = (im.naturalHeight||im.height) * scale;
+let dX = sx + (sw - dW) / 2;
+let dY = sy + (sh - dH) / 2;
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
