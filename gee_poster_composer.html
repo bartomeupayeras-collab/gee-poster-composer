@@ -703,6 +703,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           }
         }
         window.__PAYLOAD = payload;
+        try{ IS_CITY = !!(payload && payload.meta && String(payload.meta.entity||'') === 'cities'); }catch(e){}
         initial.mapUrl = payload.dataUrl || payload.mapUrl || payload.map || payload.url || "";
         // Support multi-map payloads (3 maps): payload.maps = [{dataUrl|mapUrl|url}, ...]
         if (Array.isArray(payload.maps) && payload.maps.length) {
@@ -799,6 +800,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
 // (typically sea + land mask). Then we choose the maximum scale that still keeps that content bbox
 // fully visible inside the slot (no crop), while filling as much space as possible.
 const _CONTENT_BBOX_CACHE = new WeakMap();
+let IS_CITY = false; // set from payload.meta.entity
 
 function _quant16_(v){ return Math.max(0, Math.min(255, (v/16|0)*16)); }
 function _key_(r,g,b){ return _quant16_(r) + "," + _quant16_(g) + "," + _quant16_(b); }
@@ -900,6 +902,9 @@ function safeScaleForSlot(img, sw, sh){
   const iw = bb.imgW, ih = bb.imgH;
   const sContain = Math.min(sw/iw, sh/ih);
   const sCover   = Math.max(sw/iw, sh/ih);
+  // For cities we prefer 'cover' to use the maximum space (small crop is acceptable because
+  // the visor already adds margins around the city geometry).
+  if(IS_CITY) return sCover;
 
   // if cover would not crop content bbox, use cover
   function fits(scale){
