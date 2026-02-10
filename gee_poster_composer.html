@@ -1074,21 +1074,13 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     const innerW = mapW - inset*2;
     const innerH = mapH - inset*2;
 
-    // aspect fit map
-    const ar = imgs[0].width / imgs[0].height;
-    const targetAr = innerW / innerH;
-    let drawW, drawH, dx, dy;
-    if(ar > targetAr){
-      drawW = innerW;
-      drawH = innerW / ar;
-      dx = innerX;
-      dy = innerY + (innerH - drawH)/2;
-    } else {
-      drawH = innerH;
-      drawW = innerH * ar;
-      dx = innerX + (innerW - drawW)/2;
-      dy = innerY;
-    }
+    // fill the available map area (cover) to avoid white side bars
+    const im0 = imgs[0];
+    const scale0 = Math.max(innerW / im0.width, innerH / im0.height);
+    const drawW = im0.width * scale0;
+    const drawH = im0.height * scale0;
+    const dx = innerX + (innerW - drawW) / 2;
+    const dy = innerY + (innerH - drawH) / 2;
 
     // frame + clip
 
@@ -1135,20 +1127,12 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = slotW;
           const sh = innerH;
           const im = imgs[i];
-          const arS = im.width / im.height;
-          const tar = sw/sh;
-          let dW, dH, dX, dY;
-          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
-          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
-          
-          // Smart zoom: try to zoom in a bit, but never so much that we crop strongly
-          let Z=1.12;
-          const maxZoomNoCrop = Math.min(sw / dW, sh / dH);
-          if (isFinite(maxZoomNoCrop) && maxZoomNoCrop > 0) {
-            Z = Math.min(Z, maxZoomNoCrop * 0.995);
-          }
-          const cX=dX+dW/2, cY=dY+dH/2;
-          dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
+          // fill each slot (cover) so the map uses all available space
+          const scale = Math.max(sw / im.width, sh / im.height);
+          let dW = im.width * scale;
+          let dH = im.height * scale;
+          let dX = sx + (sw - dW) / 2;
+          let dY = sy + (sh - dH) / 2;
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
@@ -1177,20 +1161,12 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           const sw = innerW;
           const sh = slotH;
           const im = imgs[i];
-          const arS = im.width / im.height;
-          const tar = sw/sh;
-          let dW, dH, dX, dY;
-          if(arS > tar){ dW=sw; dH=sw/arS; dX=sx; dY=sy+(sh-dH)/2; }
-          else { dH=sh; dW=sh*arS; dX=sx+(sw-dW)/2; dY=sy; }
-          
-          // Smart zoom: try to zoom in a bit, but never so much that we crop strongly
-          let Z=1.12;
-          const maxZoomNoCrop = Math.min(sw / dW, sh / dH);
-          if (isFinite(maxZoomNoCrop) && maxZoomNoCrop > 0) {
-            Z = Math.min(Z, maxZoomNoCrop * 0.995);
-          }
-          const cX=dX+dW/2, cY=dY+dH/2;
-          dW*=Z; dH*=Z; dX=cX-dW/2; dY=cY-dH/2;
+          // fill each slot (cover) so the map uses all available space
+          const scale = Math.max(sw / im.width, sh / im.height);
+          let dW = im.width * scale;
+          let dH = im.height * scale;
+          let dX = sx + (sw - dW) / 2;
+          let dY = sy + (sh - dH) / 2;
           ctx.save();
           // panel per map
           const rP = Math.round(18*S);
