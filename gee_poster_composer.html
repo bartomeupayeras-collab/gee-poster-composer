@@ -556,6 +556,10 @@ $("labSubtitle").textContent = t("subtitle");
     ctx.fillText("N",0,-size*1.08);
     ctx.restore();
   }
+
+  // Sea tone used to fill empty areas so there are no "white bars".
+  // Must be global because drawMapLabel() uses it.
+  const SEA_BG = "#cfe7f2";
   
   function drawMapLabel(ctx,label,x,y,w,h,S){
     ctx.save();
@@ -719,7 +723,7 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
         if(payload.dims && isFinite(payload.dims.w) && isFinite(payload.dims.h)){
           initial.dims = payload.dims;
         }
-        initial.title = payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular";
+        initial.title = cleanText(payload.title || payload.meta?.island || payload.island || payload.islandName || payload.name || "Comparador insular");
         let sub = payload.subtitle || "";
         if(!sub && payload.meta){
           const m = payload.meta;
@@ -730,12 +734,12 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
           if(m.date) parts.push(m.date);
           sub = parts.join(" · ");
         }
-        initial.subtitle = sub;
+        initial.subtitle = cleanText(sub);
 
         if(payload.meta){
           if(payload.meta.min!==null && payload.meta.min!==undefined) initial.vmin = String(payload.meta.min);
           if(payload.meta.max!==null && payload.meta.max!==undefined) initial.vmax = String(payload.meta.max);
-          initial.unit = payload.meta.unit || "";
+          initial.unit = cleanText(payload.meta.unit || "");
           if(Array.isArray(payload.meta.palette)) initial.palette = payload.meta.palette.join(",");
         }
         const f = [
@@ -764,9 +768,9 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
     setIf("mapUrl3", initial.mapUrl3);
 
     // Map labels (only shown for 3-map compositions)
-    setIf("mapLabel1", (initial.labels && initial.labels[0]) ? String(initial.labels[0]) : "");
-    setIf("mapLabel2", (initial.labels && initial.labels[1]) ? String(initial.labels[1]) : "");
-    setIf("mapLabel3", (initial.labels && initial.labels[2]) ? String(initial.labels[2]) : "");
+    setIf("mapLabel1", (initial.labels && initial.labels[0]) ? cleanText(String(initial.labels[0])) : "");
+    setIf("mapLabel2", (initial.labels && initial.labels[1]) ? cleanText(String(initial.labels[1])) : "");
+    setIf("mapLabel3", (initial.labels && initial.labels[2]) ? cleanText(String(initial.labels[2])) : "");
 
     setIf("title", initial.title);
     setIf("subtitle", initial.subtitle);
@@ -912,9 +916,9 @@ function drawLegend(ctx,x,y,w,h,vmin,vmax,unit,palette,S){
       const payloadLabels = (payloadForLabels && Array.isArray(payloadForLabels.labels)) ? payloadForLabels.labels : null;
 // Prefer user-edited labels if provided
 const inputLabels = [
-  ($("mapLabel1")? ($("mapLabel1").value||"").trim() : ""),
-  ($("mapLabel2")? ($("mapLabel2").value||"").trim() : ""),
-  ($("mapLabel3")? ($("mapLabel3").value||"").trim() : "")
+  cleanText($("mapLabel1")? ($("mapLabel1").value||"").trim() : ""),
+  cleanText($("mapLabel2")? ($("mapLabel2").value||"").trim() : ""),
+  cleanText($("mapLabel3")? ($("mapLabel3").value||"").trim() : "")
 ];
 const hasInputLabels = inputLabels.some(v => v.length);
 const mapLabels = hasInputLabels ? inputLabels : payloadLabels;
@@ -934,11 +938,11 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     let pad = parseInt($("padPx").value,10) || 60;
     pad = Math.round(pad * S);
 
-    const title = ($("title").value||"").trim() || "Pòster";
-    const subtitle = ($("subtitle").value||"").trim();
+    const title = cleanText(($("title").value||"").trim() || "Pòster");
+    const subtitle = cleanText(($("subtitle").value||"").trim());
     const vmin = (($("vmin") && $("vmin").value) || "").trim();
     const vmax = (($("vmax") && $("vmax").value) || "").trim();
-    const unit = ($("unit").value||"").trim();
+    const unit = cleanText(($("unit").value||"").trim());
     const palette = parsePalette(($("palette").value||"").trim());
     const scaleKm = (($("scaleKm") && $("scaleKm").value) || "").trim();
     let scalePx = parseFloat((( $("scalePx") && $("scalePx").value) || "").trim());
@@ -1067,9 +1071,6 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     const mapW = W - pad*2;
     const mapH = H - mapTop - (showFooter ? Math.round(130*S) : Math.round(70*S));
 
-    // palette/background for unused areas (match the sea tone so there are no "white bars")
-    const SEA_BG = "#cfe7f2";
-
     // inner padding (keep it minimal so the map uses the maximum space)
     const inset = Math.round(2*S);
     const innerX = mapX + inset;
@@ -1145,7 +1146,7 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
           ctx.drawImage(im, dX-bleed, dY-bleed, dW+bleed*2, dH+bleed*2);
           ctx.restore();
           // label
-          const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
+          const lab = (mapLabels && mapLabels[i]) ? cleanText(String(mapLabels[i])) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
         }
       } else {
@@ -1184,7 +1185,7 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
 
           ctx.drawImage(im, dX-bleed, dY-bleed, dW+bleed*2, dH+bleed*2);
           ctx.restore();
-          const lab = (mapLabels && mapLabels[i]) ? String(mapLabels[i]) : ("Mapa " + (i+1));
+          const lab = (mapLabels && mapLabels[i]) ? cleanText(String(mapLabels[i])) : ("Mapa " + (i+1));
           drawMapLabel(ctx, lab, sx, sy, sw, sh, S);
         }
       }
