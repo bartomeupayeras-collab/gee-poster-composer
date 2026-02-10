@@ -983,6 +983,47 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
         imgs.push(im);
       }
 
+      // --- Ensure the Δ (difference) map is always the middle panel (index 1) ---
+      // Some visor versions may still send A, B, Δ; we normalize to A, Δ, B for display.
+      // Detection is based on the provided labels (user inputs or payload labels).
+      if(imgs.length===3){
+        const labelsForDetect = Array.isArray(mapLabels) ? mapLabels : null;
+        const norm = (s)=>String(s||"").toLowerCase();
+        const isDiffLabel = (s)=>{
+          const t = norm(s);
+          if(!t) return false;
+          // Common markers for difference maps (CA/ES/EN)
+          return (
+            t.includes('Δ'.toLowerCase()) ||
+            t.includes('delta') ||
+            t.includes('diff') ||
+            t.includes('difer') ||
+            t.includes('b-a') ||
+            t.includes('b−a') ||
+            t.includes('b – a') ||
+            t.includes('b - a')
+          );
+        };
+        let diffIdx = -1;
+        if(labelsForDetect){
+          for(let i=0;i<3;i++){
+            if(isDiffLabel(labelsForDetect[i])){ diffIdx=i; break; }
+          }
+        }
+        // If labels didn't help, but we have a dedicated diff legend in the payload,
+        // assume the last map is Δ (historical behavior) and move it to the middle.
+        if(diffIdx===-1 && diffLegendRaw){
+          diffIdx = 2;
+        }
+        if(diffIdx!==-1 && diffIdx!==1){
+          const swap = (arr,a,b)=>{ const tmp=arr[a]; arr[a]=arr[b]; arr[b]=tmp; };
+          swap(imgs, diffIdx, 1);
+          // keep URLs consistent with images (used later for error messages / debug)
+          if(useUrls.length===3) swap(useUrls, diffIdx, 1);
+          if(labelsForDetect && labelsForDetect.length===3) swap(labelsForDetect, diffIdx, 1);
+        }
+      }
+
     const W=outW, H=outH;
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
