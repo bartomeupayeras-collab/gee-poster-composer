@@ -927,6 +927,54 @@ function safeScaleForSlot(img, sw, sh){
     if(fits(mid)) lo = mid; else hi = mid;
   }
   return lo;
+
+
+// ---------- scale bbox correction for 'cover' (auto, no hardcoding) ----------
+// When we draw with a cover-like scale (image larger than slot), the visible area is a central crop.
+// The thumb bbox corresponds to the full PNG extent, so we must compute the *visible* bbox for a correct scale bar.
+let __SCALE_CTX__ = null; // {bbox, iw, ih, sw, sh, scale}
+
+/** Returns a bbox (w,e,s,n) adjusted to the visible crop caused by cover scaling. */
+function visibleBboxFromDraw(bbox, iw, ih, sw, sh, scale){
+  try{
+    if(!bbox || !isFinite(scale) || scale<=0) return bbox;
+    iw = Math.max(1, iw|0); ih = Math.max(1, ih|0);
+    sw = Math.max(1, sw);   sh = Math.max(1, sh);
+
+    // Visible crop in image pixel coords (centered)
+    const cropW = sw / scale;
+    const cropH = sh / scale;
+
+    // If we're in contain (no crop), keep original bbox
+    if(cropW >= iw && cropH >= ih) return bbox;
+
+    const cx = (iw - cropW)/2;
+    const cy = (ih - cropH)/2;
+
+    // Clamp to image bounds (paranoia)
+    const x0 = Math.max(0, cx);
+    const y0 = Math.max(0, cy);
+    const x1 = Math.min(iw, cx + cropW);
+    const y1 = Math.min(ih, cy + cropH);
+
+    const fx0 = x0 / iw, fx1 = x1 / iw;
+    const fy0 = y0 / ih, fy1 = y1 / ih;
+
+    // Linear mapping image->geo (bbox corresponds to full image)
+    const w = +bbox.w, e = +bbox.e, s = +bbox.s, n = +bbox.n;
+    const lon0 = w + (e-w) * fx0;
+    const lon1 = w + (e-w) * fx1;
+
+    // y grows downward; north is top of image
+    const lat0 = n - (n-s) * fy0;
+    const lat1 = n - (n-s) * fy1;
+
+    return { w: Math.min(lon0, lon1), e: Math.max(lon0, lon1),
+             s: Math.min(lat0, lat1), n: Math.max(lat0, lat1) };
+  }catch(_e){
+    return bbox;
+  }
+}
 }
 
   function setCanvasSize(outW,outH){
@@ -1227,6 +1275,18 @@ let drawH = (im0.naturalHeight||im0.height) * scale0;
 let dx = innerX + (innerW - drawW) / 2;
 let dy = innerY + (innerH - drawH) / 2;
 
+// Cache the actual draw context for the scale bar (single-map case)
+try{
+  __SCALE_CTX__ = {
+    bbox: (initial && initial.bbox) ? initial.bbox : null,
+    iw: (im0.naturalWidth||im0.width),
+    ih: (im0.naturalHeight||im0.height),
+    sw: innerW,
+    sh: innerH,
+    scale: scale0
+  };
+}catch(_e){}
+
     // frame + clip
     // Fill with sea tone so any leftover space looks natural (not white)
     ctx.fillStyle = SEA_BG;
@@ -1248,6 +1308,16 @@ let dy = innerY + (innerH - drawH) / 2;
       // IMPORTANT: use selected value (string), not the DOM element.
       const isLand = (arSel === "a4_land");
       const gapIn = Math.round(22*S);
+
+// Which map should drive the single scale bar in 3-map compositions?
+// (defaults to map 1; can be overridden by payload.meta.scaleMapIndex)
+let __scaleMapIdx__ = 0;
+try{
+  const p = window.__PAYLOAD || null;
+  const v = p && p.meta && p.meta.scaleMapIndex;
+  if(isFinite(v)) __scaleMapIdx__ = Math.max(0, Math.min(2, Math.round(+v)));
+}catch(_e){}
+
       if(isLand){
         const slotW = (innerW - gapIn*2)/3;
         for(let i=0;i<3;i++){
@@ -1258,6 +1328,40 @@ let dy = innerY + (innerH - drawH) / 2;
           const im = imgs[i];
 // Fit: maximize visible content without cropping it
 const scale = safeScaleForSlot(im, sw, sh);
+
+// Cache draw context for scale bar (3-map case) using the chosen map index
+if(i === __scaleMapIdx__){
+  try{
+    const p = window.__PAYLOAD || null;
+    const bb = (p && Array.isArray(p.bboxPerMap) && p.bboxPerMap[i]) ? p.bboxPerMap[i] : (initial && initial.bbox ? initial.bbox : null);
+    __SCALE_CTX__ = {
+      bbox: bb ? {w:+bb.w, e:+bb.e, s:+bb.s, n:+bb.n} : null,
+      iw: (im.naturalWidth||im.width),
+      ih: (im.naturalHeight||im.height),
+      sw: sw,
+      sh: sh,
+      scale: scale
+    };
+  }catch(_e){}
+}
+
+
+// Cache draw context for scale bar (3-map case) using the chosen map index
+if(i === __scaleMapIdx__){
+  try{
+    const p = window.__PAYLOAD || null;
+    const bb = (p && Array.isArray(p.bboxPerMap) && p.bboxPerMap[i]) ? p.bboxPerMap[i] : (initial && initial.bbox ? initial.bbox : null);
+    __SCALE_CTX__ = {
+      bbox: bb ? {w:+bb.w, e:+bb.e, s:+bb.s, n:+bb.n} : null,
+      iw: (im.naturalWidth||im.width),
+      ih: (im.naturalHeight||im.height),
+      sw: sw,
+      sh: sh,
+      scale: scale
+    };
+  }catch(_e){}
+}
+
 let dW = (im.naturalWidth||im.width) * scale;
 let dH = (im.naturalHeight||im.height) * scale;
 let dX = sx + (sw - dW) / 2;
@@ -1330,16 +1434,31 @@ let dY = sy + (sh - dH) / 2;
         // 1) manual override
         let km = Number(scaleKm);
         // 2) auto-scale from bbox if available
-        if(!(isFinite(km) && km>0) && initial.bbox){
-          const b = initial.bbox;
-          const midLat = (b.n + b.s)/2;
-          const bboxWidthKm = haversineKm(b.w, midLat, b.e, midLat);
-          // Use the actual drawn map width (drawW) to compute km/px
-          const kmPerPx = bboxWidthKm / Math.max(1, drawW);
-          const targetKm = kmPerPx * scalePx;
-          km = niceKm(targetKm);
-          // keep the bar visually consistent: adjust pixels to match the chosen nice km
-          scalePx = Math.round(km / kmPerPx);
+        if(!(isFinite(km) && km>0)){
+          // Auto-scale from bbox, corrected for any 'cover' crop (cities, tight slots)
+          const sc = (__SCALE_CTX__ && __SCALE_CTX__.bbox) ? __SCALE_CTX__ : null;
+          const b0 = sc ? sc.bbox : (initial ? initial.bbox : null);
+          if(b0){
+            const iw = sc ? sc.iw : (im0 ? (im0.naturalWidth||im0.width) : 0);
+            const ih = sc ? sc.ih : (im0 ? (im0.naturalHeight||im0.height) : 0);
+            const sw = sc ? sc.sw : innerW;
+            const sh = sc ? sc.sh : innerH;
+            const sca = sc ? sc.scale : scale0;
+
+            const b = visibleBboxFromDraw(b0, iw, ih, sw, sh, sca);
+            const midLat = (b.n + b.s)/2;
+            const bwKm = haversineKm(b.w, midLat, b.e, midLat);
+
+            // Visible map width in pixels (slot if cover; drawn image width if contain)
+            const drawnW = Math.max(1, (iw||1) * (sca||1));
+            const mapPxW = Math.max(1, Math.min(sw, drawnW));
+
+            const kmPerPx = bwKm / mapPxW;
+            const targetKm = kmPerPx * scalePx;
+            km = niceKm(targetKm);
+            // Adjust pixels so the chosen nice km is represented correctly
+            scalePx = Math.round(km / kmPerPx);
+          }
         }
         if(isFinite(km) && km>0){
           const scaleMargin = Math.round(34*S);
