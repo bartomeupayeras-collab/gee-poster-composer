@@ -1304,16 +1304,22 @@ try{
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
-    ctx.save();
-    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-    ctx.clip();
     if(imgs.length===1){
-      ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
-    } else {
-      // 3-map layout inside the same frame
-      // IMPORTANT: use selected value (string), not the DOM element.
-      const isLand = (arSel === "a4_land");
-      const gapIn = Math.round(22*S);
+
+  // 🔧 Single map → NO clip (evita tall lateral amb zoom)
+  ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
+
+} else {
+
+  // 🔧 Només en layout de 3 mapes fem clip del frame
+  ctx.save();
+  drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+  ctx.clip();
+
+  // 3-map layout inside the same frame
+  const isLand = (arSel === "a4_land");
+  const gapIn = Math.round(22*S);
+
 
 // Which map should drive the single scale bar in 3-map compositions?
 // (defaults to map 1; can be overridden by payload.meta.scaleMapIndex)
