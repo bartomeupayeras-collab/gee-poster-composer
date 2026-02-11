@@ -1271,18 +1271,67 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
 
 // compute draw rect for the single-map case (maximize content, no cropping)
 const im0 = imgs[0];
-const scale0 = safeScaleForSlot(im0, innerW, innerH);
-let drawW = (im0.naturalWidth||im0.width) * scale0;
-let drawH = (im0.naturalHeight||im0.height) * scale0;
+
+// --- NEW: optionally crop to content bbox for islands so the map fills the frame ---
+let sx0 = 0, sy0 = 0;
+let sw0 = (im0.naturalWidth||im0.width);
+let sh0 = (im0.naturalHeight||im0.height);
+
+try{
+  // If it's not a city, we can auto-crop big background margins (typical for island zoom exports)
+  const wantCrop = !IS_CITY;
+  if(wantCrop){
+    const bb = computeContentBBox(im0); // {x0,y0,x1,y1} in image px
+    const iw = sw0, ih = sh0;
+
+    const bw = Math.max(1, bb.x1 - bb.x0);
+    const bh = Math.max(1, bb.y1 - bb.y0);
+    const areaFrac = (bw*bh) / (iw*ih);
+
+    // Only crop when content is "small" compared to the full image (avoid overreacting)
+    if(areaFrac < 0.70){
+      const pad = Math.round(Math.min(iw, ih) * 0.03); // ~3% padding
+      sx0 = Math.max(0, bb.x0 - pad);
+      sy0 = Math.max(0, bb.y0 - pad);
+      sw0 = Math.min(iw - sx0, bw + pad*2);
+      sh0 = Math.min(ih - sy0, bh + pad*2);
+    }
+  }
+}catch(_e){}
+
+// Fit the (possibly cropped) source rect into the slot (still NO cropping in the poster)
+const scale0 = Math.min(innerW / sw0, innerH / sh0);
+let drawW = sw0 * scale0;
+let drawH = sh0 * scale0;
 let dx = innerX + (innerW - drawW) / 2;
 let dy = innerY + (innerH - drawH) / 2;
 
 // Cache the actual draw context for the scale bar (single-map case)
+// IMPORTANT: if we cropped, adjust bbox accordingly so scale stays correct.
 try{
+  let bboxUse = (initial && initial.bbox) ? initial.bbox : null;
+  if(bboxUse && (sx0||sy0||sw0!== (im0.naturalWidth||im0.width) || sh0!== (im0.naturalHeight||im0.height))){
+    const iw = (im0.naturalWidth||im0.width);
+    const ih = (im0.naturalHeight||im0.height);
+    const fx0 = sx0 / iw, fy0 = sy0 / ih;
+    const fx1 = (sx0 + sw0) / iw, fy1 = (sy0 + sh0) / ih;
+
+    const W = bboxUse.e - bboxUse.w;
+    const H = bboxUse.n - bboxUse.s;
+
+    bboxUse = {
+      w: bboxUse.w + W * fx0,
+      e: bboxUse.w + W * fx1,
+      // y origin is top in image, but bbox uses south/north
+      n: bboxUse.n - H * fy0,
+      s: bboxUse.n - H * fy1
+    };
+  }
+
   __SCALE_CTX__ = {
-    bbox: (initial && initial.bbox) ? initial.bbox : null,
-    iw: (im0.naturalWidth||im0.width),
-    ih: (im0.naturalHeight||im0.height),
+    bbox: bboxUse,
+    iw: sw0,
+    ih: sh0,
     sw: innerW,
     sh: innerH,
     scale: scale0
@@ -1304,7 +1353,7 @@ try{
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
     if(imgs.length===1){
-      ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
+      ctx.drawImage(imgs[0], sx0, sy0, sw0, sh0, dx, dy, drawW, drawH);
     } else {
       // 3-map layout inside the same frame
       // IMPORTANT: use selected value (string), not the DOM element.
