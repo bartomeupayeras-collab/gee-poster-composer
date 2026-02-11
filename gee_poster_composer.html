@@ -928,6 +928,8 @@ function safeScaleForSlot(img, sw, sh){
   }
   return lo;
 
+}
+
 
 // ---------- scale bbox correction for 'cover' (auto, no hardcoding) ----------
 // When we draw with a cover-like scale (image larger than slot), the visible area is a central crop.
@@ -975,7 +977,7 @@ function visibleBboxFromDraw(bbox, iw, ih, sw, sh, scale){
     return bbox;
   }
 }
-}
+
 
   function setCanvasSize(outW,outH){
     const dpr=Math.max(1, Math.floor(window.devicePixelRatio||1));
