@@ -902,9 +902,13 @@ function safeScaleForSlot(img, sw, sh){
   const iw = bb.imgW, ih = bb.imgH;
   const sContain = Math.min(sw/iw, sh/ih);
   const sCover   = Math.max(sw/iw, sh/ih);
-  // For cities we prefer 'cover' to use the maximum space (small crop is acceptable because
-  // the visor already adds margins around the city geometry).
-  if(IS_CITY) return sCover;
+
+  // 🔧 FIX DEFINITIU:
+  // Només aplicar COVER en ciutats quan hi ha 3 mapes.
+  // En composició d'1 mapa (zoom a ciutat), usar CONTAIN per evitar tall.
+  const isSingleMap = (typeof imgs !== "undefined" && imgs.length === 1);
+
+  if(IS_CITY && !isSingleMap) return sCover;
 
   // if cover would not crop content bbox, use cover
   function fits(scale){
@@ -912,7 +916,7 @@ function safeScaleForSlot(img, sw, sh){
     const cropH = sh/scale;
     const cx = (iw - cropW)/2;
     const cy = (ih - cropH)/2;
-    const m = 0.0; // extra margin already applied in bbox padding
+    const m = 0.0;
     return (cx <= bb.x-m) &&
            (cy <= bb.y-m) &&
            (cx+cropW >= (bb.x+bb.w)+m) &&
@@ -927,8 +931,8 @@ function safeScaleForSlot(img, sw, sh){
     if(fits(mid)) lo = mid; else hi = mid;
   }
   return lo;
-
 }
+
 
 
 // ---------- scale bbox correction for 'cover' (auto, no hardcoding) ----------
