@@ -1281,18 +1281,91 @@ try{
   // If it's not a city, we can auto-crop big background margins (typical for island zoom exports)
   const wantCrop = !IS_CITY;
   if(wantCrop){
-    const bb = computeContentBBox(im0); // {x0,y0,x1,y1} in image px
+    const bb = computeContentBBox(im0); // {x,y,w,h} in image px
     const iw = sw0, ih = sh0;
 
-    const bw = Math.max(1, bb.w);
-    const bh = Math.max(1, bb.h);
+    const bw = Math.max(1, bbUse.w);
+    const bh = Math.max(1, bbUse.h);
     const areaFrac = (bw*bh) / (iw*ih);
+
+    // Fallback: if the coarse bbox thinks "everything is content", try a downsampled detector
+    // (helps when outlines are thin and the scan misses them).
+    let bbUse = bb;
+    if(areaFrac > 0.92){
+      try{
+        const iw2 = iw, ih2 = ih;
+        const maxS = 420;
+        const sc = Math.min(1, maxS / Math.max(iw2, ih2));
+        const tw = Math.max(2, Math.round(iw2 * sc));
+        const th = Math.max(2, Math.round(ih2 * sc));
+        const c2 = document.createElement('canvas');
+        c2.width = tw; c2.height = th;
+        const g2 = c2.getContext('2d', { willReadFrequently: true });
+        g2.drawImage(im0, 0, 0, tw, th);
+        const d = g2.getImageData(0,0,tw,th).data;
+
+        // background candidates from edges
+        const counts2 = new Map();
+        const step2 = Math.max(1, Math.round(Math.min(tw,th)/220));
+        function add2(ix){
+          const r=d[ix], gg=d[ix+1], b=d[ix+2], a=d[ix+3];
+          if(a < 10) return;
+          const k=_key_(r,gg,b);
+          counts2.set(k, (counts2.get(k)||0)+1);
+        }
+        for(let x=0;x<tw;x+=step2){
+          add2((0*tw + x)*4);
+          add2(((th-1)*tw + x)*4);
+        }
+        for(let y=0;y<th;y+=step2){
+          add2((y*tw + 0)*4);
+          add2((y*tw + (tw-1))*4);
+        }
+        const top2 = [...counts2.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>e[0]);
+        function parseKey2(k){ const p=k.split(',').map(Number); return {r:p[0], g:p[1], b:p[2]}; }
+        const bgA = top2[0] ? parseKey2(top2[0]) : {r:210,g:235,b:245};
+        const bgB = top2[1] ? parseKey2(top2[1]) : {r:240,g:240,b:240};
+
+        let minx2=tw, miny2=th, maxx2=0, maxy2=0, found2=false;
+        const thr2 = 22; // more sensitive than computeContentBBox
+        const scan2 = Math.max(1, Math.round(Math.min(tw,th)/320));
+        for(let y=0;y<th;y+=scan2){
+          for(let x=0;x<tw;x+=scan2){
+            const i=(y*tw+x)*4;
+            const r=d[i], gg=d[i+1], b=d[i+2], a=d[i+3];
+            if(a < 10) continue;
+            const isDark = (r+gg+b) < 200; // less strict to catch outlines
+            const d1=_dist_(r,gg,b,bgA.r,bgA.g,bgA.b);
+            const d2=_dist_(r,gg,b,bgB.r,bgB.g,bgB.b);
+            const isContent = isDark || (d1>thr2 && d2>thr2);
+            if(isContent){
+              found2=true;
+              if(x<minx2) minx2=x;
+              if(y<miny2) miny2=y;
+              if(x>maxx2) maxx2=x;
+              if(y>maxy2) maxy2=y;
+            }
+          }
+        }
+        if(found2){
+          const pad2 = Math.round(0.03*Math.min(tw,th));
+          minx2=Math.max(0, minx2-pad2);
+          miny2=Math.max(0, miny2-pad2);
+          maxx2=Math.min(tw, maxx2+pad2);
+          maxy2=Math.min(th, maxy2+pad2);
+          // map back to full-res px
+          const inv = 1/sc;
+          bbUse = { x: minx2*inv, y: miny2*inv, w: Math.max(1,(maxx2-minx2)*inv), h: Math.max(1,(maxy2-miny2)*inv) };
+        }
+      }catch(_e2){}
+    }
+
 
     // Only crop when content is "small" compared to the full image (avoid overreacting)
     if(areaFrac < 0.70){
       const pad = Math.round(Math.min(iw, ih) * 0.03); // ~3% padding
-      sx0 = Math.max(0, bb.x - pad);
-      sy0 = Math.max(0, bb.y - pad);
+      sx0 = Math.max(0, bbUse.x - pad);
+      sy0 = Math.max(0, bbUse.y - pad);
       sw0 = Math.min(iw - sx0, bw + pad*2);
       sh0 = Math.min(ih - sy0, bh + pad*2);
     }
