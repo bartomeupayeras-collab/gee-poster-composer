@@ -902,13 +902,9 @@ function safeScaleForSlot(img, sw, sh){
   const iw = bb.imgW, ih = bb.imgH;
   const sContain = Math.min(sw/iw, sh/ih);
   const sCover   = Math.max(sw/iw, sh/ih);
-
-  // 🔧 FIX DEFINITIU:
-  // Només aplicar COVER en ciutats quan hi ha 3 mapes.
-  // En composició d'1 mapa (zoom a ciutat), usar CONTAIN per evitar tall.
-  const isSingleMap = (typeof imgs !== "undefined" && imgs.length === 1);
-
-  if(IS_CITY && !isSingleMap) return sCover;
+  // For cities we prefer 'cover' to use the maximum space (small crop is acceptable because
+  // the visor already adds margins around the city geometry).
+  if(IS_CITY) return sCover;
 
   // if cover would not crop content bbox, use cover
   function fits(scale){
@@ -916,7 +912,7 @@ function safeScaleForSlot(img, sw, sh){
     const cropH = sh/scale;
     const cx = (iw - cropW)/2;
     const cy = (ih - cropH)/2;
-    const m = 0.0;
+    const m = 0.0; // extra margin already applied in bbox padding
     return (cx <= bb.x-m) &&
            (cy <= bb.y-m) &&
            (cx+cropW >= (bb.x+bb.w)+m) &&
@@ -931,8 +927,8 @@ function safeScaleForSlot(img, sw, sh){
     if(fits(mid)) lo = mid; else hi = mid;
   }
   return lo;
-}
 
+}
 
 
 // ---------- scale bbox correction for 'cover' (auto, no hardcoding) ----------
@@ -1304,22 +1300,16 @@ try{
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.stroke();
 
+    ctx.save();
+    drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
+    ctx.clip();
     if(imgs.length===1){
-
-  // 🔧 Single map → NO clip (evita tall lateral amb zoom)
-  ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
-
-} else {
-
-  // 🔧 Només en layout de 3 mapes fem clip del frame
-  ctx.save();
-  drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
-  ctx.clip();
-
-  // 3-map layout inside the same frame
-  const isLand = (arSel === "a4_land");
-  const gapIn = Math.round(22*S);
-
+      ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
+    } else {
+      // 3-map layout inside the same frame
+      // IMPORTANT: use selected value (string), not the DOM element.
+      const isLand = (arSel === "a4_land");
+      const gapIn = Math.round(22*S);
 
 // Which map should drive the single scale bar in 3-map compositions?
 // (defaults to map 1; can be overridden by payload.meta.scaleMapIndex)
