@@ -1269,142 +1269,32 @@ const diffLegendRaw = payloadForLabels && payloadForLabels.legendDiff ? payloadF
     const innerH = mapH - inset*2;
 
 
-// compute draw rect for the single-map case (maximize content, no cropping)
+// compute draw rect for the single-map case
 const im0 = imgs[0];
+const imW0 = (im0.naturalWidth||im0.width);
+const imH0 = (im0.naturalHeight||im0.height);
 
-// --- NEW: optionally crop to content bbox for islands so the map fills the frame ---
-let sx0 = 0, sy0 = 0;
-let sw0 = (im0.naturalWidth||im0.width);
-let sh0 = (im0.naturalHeight||im0.height);
+// For islands (non-cities) we want the map to fill the available space even if the
+// exported PNG contains a lot of surrounding sea. Pixel-based auto-crop can fail
+// when the image is CORS-tainted (cannot read pixels), so we use a robust 'cover' fit.
+let scale0;
+if(!IS_CITY){
+  scale0 = Math.max(innerW / imW0, innerH / imH0); // cover (fills frame)
+} else {
+  scale0 = safeScaleForSlot(im0, innerW, innerH);  // contain/safe for cities
+}
 
-try{
-  // If it's not a city, we can auto-crop big background margins (typical for island zoom exports)
-  const wantCrop = !IS_CITY;
-  if(wantCrop){
-    const bb = computeContentBBox(im0); // {x,y,w,h} in image px
-    const iw = sw0, ih = sh0;
-
-    const bw = Math.max(1, bbUse.w);
-    const bh = Math.max(1, bbUse.h);
-    const areaFrac = (bw*bh) / (iw*ih);
-
-    // Fallback: if the coarse bbox thinks "everything is content", try a downsampled detector
-    // (helps when outlines are thin and the scan misses them).
-    let bbUse = bb;
-    if(areaFrac > 0.92){
-      try{
-        const iw2 = iw, ih2 = ih;
-        const maxS = 420;
-        const sc = Math.min(1, maxS / Math.max(iw2, ih2));
-        const tw = Math.max(2, Math.round(iw2 * sc));
-        const th = Math.max(2, Math.round(ih2 * sc));
-        const c2 = document.createElement('canvas');
-        c2.width = tw; c2.height = th;
-        const g2 = c2.getContext('2d', { willReadFrequently: true });
-        g2.drawImage(im0, 0, 0, tw, th);
-        const d = g2.getImageData(0,0,tw,th).data;
-
-        // background candidates from edges
-        const counts2 = new Map();
-        const step2 = Math.max(1, Math.round(Math.min(tw,th)/220));
-        function add2(ix){
-          const r=d[ix], gg=d[ix+1], b=d[ix+2], a=d[ix+3];
-          if(a < 10) return;
-          const k=_key_(r,gg,b);
-          counts2.set(k, (counts2.get(k)||0)+1);
-        }
-        for(let x=0;x<tw;x+=step2){
-          add2((0*tw + x)*4);
-          add2(((th-1)*tw + x)*4);
-        }
-        for(let y=0;y<th;y+=step2){
-          add2((y*tw + 0)*4);
-          add2((y*tw + (tw-1))*4);
-        }
-        const top2 = [...counts2.entries()].sort((a,b)=>b[1]-a[1]).slice(0,2).map(e=>e[0]);
-        function parseKey2(k){ const p=k.split(',').map(Number); return {r:p[0], g:p[1], b:p[2]}; }
-        const bgA = top2[0] ? parseKey2(top2[0]) : {r:210,g:235,b:245};
-        const bgB = top2[1] ? parseKey2(top2[1]) : {r:240,g:240,b:240};
-
-        let minx2=tw, miny2=th, maxx2=0, maxy2=0, found2=false;
-        const thr2 = 22; // more sensitive than computeContentBBox
-        const scan2 = Math.max(1, Math.round(Math.min(tw,th)/320));
-        for(let y=0;y<th;y+=scan2){
-          for(let x=0;x<tw;x+=scan2){
-            const i=(y*tw+x)*4;
-            const r=d[i], gg=d[i+1], b=d[i+2], a=d[i+3];
-            if(a < 10) continue;
-            const isDark = (r+gg+b) < 200; // less strict to catch outlines
-            const d1=_dist_(r,gg,b,bgA.r,bgA.g,bgA.b);
-            const d2=_dist_(r,gg,b,bgB.r,bgB.g,bgB.b);
-            const isContent = isDark || (d1>thr2 && d2>thr2);
-            if(isContent){
-              found2=true;
-              if(x<minx2) minx2=x;
-              if(y<miny2) miny2=y;
-              if(x>maxx2) maxx2=x;
-              if(y>maxy2) maxy2=y;
-            }
-          }
-        }
-        if(found2){
-          const pad2 = Math.round(0.03*Math.min(tw,th));
-          minx2=Math.max(0, minx2-pad2);
-          miny2=Math.max(0, miny2-pad2);
-          maxx2=Math.min(tw, maxx2+pad2);
-          maxy2=Math.min(th, maxy2+pad2);
-          // map back to full-res px
-          const inv = 1/sc;
-          bbUse = { x: minx2*inv, y: miny2*inv, w: Math.max(1,(maxx2-minx2)*inv), h: Math.max(1,(maxy2-miny2)*inv) };
-        }
-      }catch(_e2){}
-    }
-
-
-    // Only crop when content is "small" compared to the full image (avoid overreacting)
-    if(areaFrac < 0.70){
-      const pad = Math.round(Math.min(iw, ih) * 0.03); // ~3% padding
-      sx0 = Math.max(0, bbUse.x - pad);
-      sy0 = Math.max(0, bbUse.y - pad);
-      sw0 = Math.min(iw - sx0, bw + pad*2);
-      sh0 = Math.min(ih - sy0, bh + pad*2);
-    }
-  }
-}catch(_e){}
-
-// Fit the (possibly cropped) source rect into the slot (still NO cropping in the poster)
-const scale0 = Math.min(innerW / sw0, innerH / sh0);
-let drawW = sw0 * scale0;
-let drawH = sh0 * scale0;
+let drawW = imW0 * scale0;
+let drawH = imH0 * scale0;
 let dx = innerX + (innerW - drawW) / 2;
 let dy = innerY + (innerH - drawH) / 2;
 
 // Cache the actual draw context for the scale bar (single-map case)
-// IMPORTANT: if we cropped, adjust bbox accordingly so scale stays correct.
 try{
-  let bboxUse = (initial && initial.bbox) ? initial.bbox : null;
-  if(bboxUse && (sx0||sy0||sw0!== (im0.naturalWidth||im0.width) || sh0!== (im0.naturalHeight||im0.height))){
-    const iw = (im0.naturalWidth||im0.width);
-    const ih = (im0.naturalHeight||im0.height);
-    const fx0 = sx0 / iw, fy0 = sy0 / ih;
-    const fx1 = (sx0 + sw0) / iw, fy1 = (sy0 + sh0) / ih;
-
-    const W = bboxUse.e - bboxUse.w;
-    const H = bboxUse.n - bboxUse.s;
-
-    bboxUse = {
-      w: bboxUse.w + W * fx0,
-      e: bboxUse.w + W * fx1,
-      // y origin is top in image, but bbox uses south/north
-      n: bboxUse.n - H * fy0,
-      s: bboxUse.n - H * fy1
-    };
-  }
-
   __SCALE_CTX__ = {
-    bbox: bboxUse,
-    iw: sw0,
-    ih: sh0,
+    bbox: (initial && initial.bbox) ? initial.bbox : null,
+    iw: imW0,
+    ih: imH0,
     sw: innerW,
     sh: innerH,
     scale: scale0
@@ -1426,7 +1316,7 @@ try{
     drawRoundedRect(ctx, mapX, mapY, mapW, mapH, Math.round(22*S));
     ctx.clip();
     if(imgs.length===1){
-      ctx.drawImage(imgs[0], sx0, sy0, sw0, sh0, dx, dy, drawW, drawH);
+      ctx.drawImage(imgs[0], dx, dy, drawW, drawH);
     } else {
       // 3-map layout inside the same frame
       // IMPORTANT: use selected value (string), not the DOM element.
